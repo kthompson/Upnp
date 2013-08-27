@@ -15,6 +15,11 @@ namespace Upnp.Gena
         string ServiceId { get; }
     }
 
+    public interface IGenaProperty<T> : IGenaProperty
+    {
+        T Value { get; set; }
+    }
+
     public class GenaPropertySet : IXmlSerializable
     {
         private readonly Dictionary<string, IGenaProperty> _properties = new Dictionary<string, IGenaProperty>();
@@ -41,13 +46,11 @@ namespace Upnp.Gena
 
         public void Add(IGenaProperty property)
         {
-            _properties.Add(property.Name, property);
+            _properties[property.Name] = property;
         }
     }
 
-
-
-    public abstract class GenaProperty<T> : IGenaProperty
+    public abstract class GenaProperty<T> : IGenaProperty<T>
     {
         protected GenaProperty(string serviceId, string name, T value = default(T))
         {
@@ -100,7 +103,6 @@ namespace Upnp.Gena
             });
         }
 
-
         public virtual void WriteXml(XmlWriter writer)
         {
             writer.WriteStartElement("property");
@@ -108,6 +110,42 @@ namespace Upnp.Gena
             WriteValueXml(writer, this.Value);
             writer.WriteEndElement();
             writer.WriteEndElement();
+        }
+    }
+
+    public class GenaPropertyInt32 : GenaProperty<int>
+    {
+        public GenaPropertyInt32(string serviceId, string name, int value = 0)
+            : base(serviceId, name, value)
+        {
+        }
+
+        protected override int ReadValueXml(XmlReader reader)
+        {
+            return reader.ReadElementContentAsInt();
+        }
+
+        protected override void WriteValueXml(XmlWriter writer, int value)
+        {
+            writer.WriteValue(value);
+        }
+    }
+
+    public class GenaPropertyXml : GenaProperty<string>
+    {
+        public GenaPropertyXml(string serviceId, string name, string value = null)
+            : base(serviceId, name, value)
+        {
+        }
+
+        protected override string ReadValueXml(XmlReader reader)
+        {
+            return reader.ReadElementContentAsString();
+        }
+
+        protected override void WriteValueXml(XmlWriter writer, string value)
+        {
+            writer.WriteRaw(value);
         }
     }
 }

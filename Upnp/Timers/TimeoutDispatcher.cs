@@ -227,6 +227,7 @@ namespace Upnp.Timers
                     catch (Exception exception)
                     {
                         Break();
+                        Trace.WriteLine(exception, "TimeoutDispatcher");
 
                         try
                         {

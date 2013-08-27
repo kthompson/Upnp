@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Xml;
 using System.Xml.Serialization;
 
@@ -8,38 +9,36 @@ namespace Upnp.Xml
 {
     public class XmlStateMachine : IEnumerable
     {
-        readonly Dictionary<string, Action> _actions = new Dictionary<string, Action>();
-        readonly Dictionary<string, XmlStateMachine> _machines = new Dictionary<string, XmlStateMachine>();
+        readonly Dictionary<string, Action<XmlReader>> _actions = new Dictionary<string, Action<XmlReader>>();
 
-        public void Add(string key, Action value)
+        public void Add(string key, Action<XmlReader> value)
         {
             _actions.Add(key, value);
         }
 
-        public void Add(Action value)
+        public void Add(Action<XmlReader> value)
         {
-            _actions.Add(XmlHelper.DefaultParseElementName, value);
+            Add(XmlHelper.DefaultParseElementName, value);
         }
 
         public void Add(string key, XmlStateMachine value)
         {
-            _machines.Add(key, value);
+            _actions.Add(key, reader => value.Add(reader, key));
         }
 
         public void Add(XmlStateMachine value)
         {
-            _machines.Add(XmlHelper.DefaultParseElementName, value);
+            Add(XmlHelper.DefaultParseElementName, value);
         }
 
         public void Add(XmlReader reader, string endElement = null)
         {
-            foreach (var pair in _machines)
-            {
-                var pair1 = pair;
-                _actions[pair.Key] = () => pair1.Value.Add(reader);
-            }
+            XmlHelper.ParseXml(reader, _actions.ToDictionary(kv => kv.Key, kv => (Action)(() => kv.Value(reader))), endElement);
+        }
 
-            XmlHelper.ParseXml(reader, _actions, endElement);
+        public void Parse(XmlReader reader, string endElement = null)
+        {
+            Add(reader, endElement);
         }
 
         public IEnumerator GetEnumerator()

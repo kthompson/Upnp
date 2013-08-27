@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Net;
 using System.Net.Sockets;
@@ -23,7 +24,8 @@ namespace Upnp.Ssdp
 
         public virtual void JoinMulticastGroupAllInterfaces(IPEndPoint remoteEp)
         {
-            var localIps = IPAddressHelpers.GetUnicastAddresses(ip => ip.AddressFamily == remoteEp.AddressFamily);
+            var localIps = IPAddressHelpers.GetUnicastAddresses(ip => ip.AddressFamily == remoteEp.AddressFamily && !IPAddress.IsLoopback(ip));
+            
             foreach (var addr in localIps)
             {
                 try
