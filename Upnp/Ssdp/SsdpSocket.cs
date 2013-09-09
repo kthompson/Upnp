@@ -28,11 +28,11 @@ namespace Upnp.Ssdp
 
         #endregion
 
-        public void JoinMulticastGroup(IPEndPoint remoteEp)
+        public new void JoinMulticastGroup(IPAddress addr)
         {
             try
             {
-                this.JoinMulticastGroup(remoteEp.Address, this.LocalEndpoint.Address);
+                this.JoinMulticastGroup(addr, this.LocalEndpoint.Address);
             }
             catch (SocketException)
             {

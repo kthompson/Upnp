@@ -16,8 +16,8 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Starts listening on the specified remote endpoints.
         /// </summary>
-        /// <param name="remoteEps">The remote eps.</param>
-        void StartListening(params IPEndPoint[] remoteEps);
+        /// <param name="groups">The remote eps.</param>
+        void StartListening(params IPAddress[] groups);
 
         /// <summary>
         /// Stops listening on all end points.

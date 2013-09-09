@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace Upnp.Ssdp
 {
@@ -28,7 +29,7 @@ namespace Upnp.Ssdp
         /// Creates a search.
         /// </summary>
         /// <returns></returns>
-        public virtual SsdpSearch CreateSearch(bool requireUniqueLocation)
+        public virtual ISsdpSearch CreateSearch(bool requireUniqueLocation)
         {
             var search = new SsdpSearch(this.Sockets.ToArray());
 
@@ -59,10 +60,55 @@ namespace Upnp.Ssdp
             return search;
         }
 
-        #endregion
 
-        #region Protected Methods
+        /// <summary>
+        /// Finds the first SsdpMessage that matches our Filter.
+        /// </summary>
+        /// <param name="waitForTime">The wait for time.</param>
+        /// <returns></returns>
+        public SsdpMessage FindFirst(TimeSpan waitForTime)
+        {
+            object syncRoot = new object();
+            SsdpMessage result = null;
+            EventHandler<EventArgs<SsdpMessage>> resultHandler = null;
 
+            // Create our handler to make all the magic happen
+            resultHandler = (sender, e) =>
+            {
+                lock (syncRoot)
+                {
+                    // If we already got our first result then ignore this
+                    if (result != null)
+                        return;
+
+                    // This is our first result so set our value, remove the handler, and cancel the search
+                    result = e.Value;
+                    this.SsdpMessageReceived -= resultHandler;
+
+                    Monitor.Pulse(syncRoot);
+                }
+            };
+
+            try
+            {
+                
+                // Add our handler and start the async search
+                this.SsdpMessageReceived += resultHandler;
+
+                // Wait until our search is complete
+                lock (syncRoot)
+                {
+                    Monitor.Wait(syncRoot, waitForTime);
+                }
+            }
+            finally
+            {
+                // Make sure we remove our handler when we're done
+                this.SsdpMessageReceived -= resultHandler;
+            }
+
+            return result;
+        }
         #endregion
 
         #region Events
@@ -85,10 +131,5 @@ namespace Upnp.Ssdp
         }
 
         #endregion
-
-        #region Properties
-
-        #endregion
-
     }
 }

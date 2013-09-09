@@ -64,6 +64,7 @@
     <Compile Include="Ssdp\ISsdpAnnouncer.cs" />
     <Compile Include="Ssdp\ISsdpClient.cs" />
     <Compile Include="Ssdp\ISsdpListener.cs" />
+    <Compile Include="Ssdp\ISsdpSearch.cs" />
     <Compile Include="Ssdp\ISsdpServer.cs" />
     <Compile Include="Ssdp\ISsdpSocket.cs" />
     <Compile Include="Ssdp\Protocol.cs" />

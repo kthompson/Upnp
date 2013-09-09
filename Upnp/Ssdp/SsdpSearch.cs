@@ -13,7 +13,7 @@ namespace Upnp.Ssdp
     /// <summary>
     /// Class representing an SSDP Search
     /// </summary>
-    public class SsdpSearch
+    class SsdpSearch : ISsdpSearch
     {
 
         #region Constructors
@@ -27,7 +27,7 @@ namespace Upnp.Ssdp
                 sockets = SsdpSocketFactory.BuildSockets().ToArray();
 
             this.Sockets = new SsdpSocketCollection(sockets);
-            this.HostEndpoint = Protocol.DiscoveryEndpoints.IPv4;
+            this.HostEndpoint = new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, Protocol.DefaultPort);
             this.SearchType = Protocol.SsdpAll;
             this.Mx = Protocol.DefaultMx;
         }
@@ -156,10 +156,10 @@ namespace Upnp.Ssdp
 
             // If no destinations were specified then default to the IPv4 discovery
             if (destinations == null || destinations.Length == 0)
-                destinations = new[] { Protocol.DiscoveryEndpoints.IPv4 };
+                destinations = new[] {new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, Protocol.DefaultPort)};
 
-            // Start the server
-            this.Sockets.StartListening(destinations);
+            // Start the server and join our igmp groups
+            this.Sockets.StartListening(destinations.Select(ep => ep.Address).ToArray());
 
             // Now send out our search data
             foreach (var dest in destinations)

@@ -76,11 +76,11 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Starts listening on the specified remote endpoints.
         /// </summary>
-        /// <param name="remoteEps">The remote eps.</param>
-        public virtual void StartListening(params IPEndPoint[] remoteEps)
+        /// <param name="groups">The remote eps.</param>
+        public virtual void StartListening(params IPAddress[] groups)
         {
-            if (remoteEps == null || remoteEps.Length == 0)
-                remoteEps = new[] { Protocol.DiscoveryEndpoints.IPv4 };
+            if (groups == null || groups.Length == 0)
+                groups = new[] { Protocol.DiscoveryEndpoints.IPv4 };
 
             ForEachSocket(socket =>
             {
@@ -97,10 +97,10 @@ namespace Upnp.Ssdp
 
                 Trace.WriteLine(string.Format("Listening on {0}", socket.LocalEndpoint), AppInfo.Application);
                 // Join all the multicast groups specified
-                foreach (var ep in remoteEps.Where(ep => ep.AddressFamily == socket.LocalEndpoint.AddressFamily && IPAddressHelpers.IsMulticast(ep.Address)))
+                foreach (var group in groups.Where(ep => ep.AddressFamily == socket.LocalEndpoint.AddressFamily && IPAddressHelpers.IsMulticast(ep)))
                 {
-                    socket.JoinMulticastGroup(ep);
-                    Trace.WriteLine(string.Format("Interface {0} joined igmp group {1}", socket.LocalEndpoint, ep), AppInfo.Application);
+                    socket.JoinMulticastGroup(group);
+                    Trace.WriteLine(string.Format("Interface {0} joined igmp group {1}", socket.LocalEndpoint, group), AppInfo.Application);
                 }
             });
         }

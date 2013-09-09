@@ -30,7 +30,11 @@ namespace Upnp.Ssdp
             this.MaxAge = Protocol.DefaultMaxAge;
             this.NotificationType = string.Empty;
             this.USN = string.Empty;
-            this.RemoteEndPoints = new SyncCollection<IPEndPoint> { Protocol.DiscoveryEndpoints.IPv4, Protocol.DiscoveryEndpoints.Broadcast };
+            this.RemoteEndPoints = new SyncCollection<IPEndPoint>
+                {
+                    new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, Protocol.DefaultPort), 
+                    new IPEndPoint(Protocol.DiscoveryEndpoints.Broadcast, Protocol.DefaultPort)
+                };
         }
 
         #endregion
@@ -62,7 +66,10 @@ namespace Upnp.Ssdp
                     this.SendSyncAliveMessage();
                         
                     // add second advert for 200ms from now:
-                    this.TimeoutTokens.Add(Dispatcher.Add(() => this.SendSyncAliveMessage(), TimeSpan.FromMilliseconds(200)));
+                    lock (this.SyncRoot)
+                    {
+                        this.TimeoutTokens.Add(Dispatcher.Add(() => this.SendSyncAliveMessage(), TimeSpan.FromMilliseconds(200)));
+                    }
                 }, TimeSpan.FromMilliseconds(random.Next(0, 100))));
                 
 

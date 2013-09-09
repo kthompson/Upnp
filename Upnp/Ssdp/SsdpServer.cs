@@ -116,9 +116,9 @@ namespace Upnp.Ssdp
             }
         }
 
-        public override void StartListening(params IPEndPoint[] remoteEps)
+        public override void StartListening(params IPAddress[] groups)
         {
-            base.StartListening(remoteEps);
+            base.StartListening(groups);
 
             lock (this.Announcers)
             {

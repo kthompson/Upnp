@@ -107,9 +107,9 @@ namespace Upnp.Upnp
             this.SsdpServer.StopListening();
         }
 
-        public void StartListening(params IPEndPoint[] remoteEps)
+        public void StartListening(params IPAddress[] groups)
         {
-            this.SsdpServer.StartListening(remoteEps);
+            this.SsdpServer.StartListening(groups);
         }
 
         public void Dispose()

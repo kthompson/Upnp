@@ -54,10 +54,10 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Starts listening on the specified remote endpoints.
         /// </summary>
-        /// <param name="remoteEps">The remote eps.</param>
-        public virtual void StartListening(params IPEndPoint[] remoteEps)
+        /// <param name="groups">The remote eps.</param>
+        public virtual void StartListening(params IPAddress[] groups)
         {
-            this.Sockets.StartListening(remoteEps);
+            this.Sockets.StartListening(groups);
         }
 
         ///// <summary>

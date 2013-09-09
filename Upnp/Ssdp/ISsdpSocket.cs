@@ -41,7 +41,7 @@ namespace Upnp.Ssdp
         void StartListening();
         void StopListening();
 
-        void JoinMulticastGroup(IPEndPoint remoteEp);
+        void JoinMulticastGroup(IPAddress remoteEp);
         void DropMulticastGroup(IPAddress address);
 
         int Send(byte[] dgram, int bytes, IPEndPoint endPoint);

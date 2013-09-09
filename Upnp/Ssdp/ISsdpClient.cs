@@ -8,7 +8,14 @@ namespace Upnp.Ssdp
         /// Creates a search.
         /// </summary>
         /// <returns></returns>
-        SsdpSearch CreateSearch(bool requireUniqueLocation);
+        ISsdpSearch CreateSearch(bool requireUniqueLocation);
+
+        /// <summary>
+        /// Finds the first SsdpMessage that matches our Filter.
+        /// </summary>
+        /// <param name="waitForTime">The wait for time.</param>
+        /// <returns></returns>
+        SsdpMessage FindFirst(TimeSpan waitForTime);
 
         /// <summary>
         /// Occurs when [search response].

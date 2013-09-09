@@ -14,12 +14,12 @@ namespace Upnp.Ssdp
         /// </summary>
         public static class DiscoveryEndpoints
         {
-            public static readonly IPEndPoint IPv4 = new IPEndPoint(IPAddress.Parse("239.255.255.250"), DefaultPort);
-            public static readonly IPEndPoint Broadcast = new IPEndPoint(IPAddress.Broadcast, DefaultPort);
-            public static readonly IPEndPoint IPv6LinkLocal = new IPEndPoint(IPAddress.Parse("FF02::C"), DefaultPort);
-            public static readonly IPEndPoint IPv6SiteLocal = new IPEndPoint(IPAddress.Parse("FF05::C"), DefaultPort);
-            public static readonly IPEndPoint IPv6OrganizationLocal = new IPEndPoint(IPAddress.Parse("FF08::C"), DefaultPort);
-            public static readonly IPEndPoint IPv6Global = new IPEndPoint(IPAddress.Parse("FF0E::C"), DefaultPort);
+            public static readonly IPAddress IPv4 = IPAddress.Parse("239.255.255.250");
+            public static readonly IPAddress Broadcast = IPAddress.Broadcast;
+            public static readonly IPAddress IPv6LinkLocal = IPAddress.Parse("FF02::C");
+            public static readonly IPAddress IPv6SiteLocal = IPAddress.Parse("FF05::C");
+            public static readonly IPAddress IPv6OrganizationLocal = IPAddress.Parse("FF08::C");
+            public static readonly IPAddress IPv6Global = IPAddress.Parse("FF0E::C");
         }
 
         public const int DefaultPort = 1900;

@@ -10,6 +10,11 @@ namespace Upnp.Ssdp
 {
     public static class SsdpSocketFactory
     {
+        public static IEnumerable<ISsdpSocket> BuildSockets(params int[] ports)
+        {
+            return BuildSockets("device.xml", ports);
+        }
+        
         public static IEnumerable<ISsdpSocket> BuildSockets(string locationPath = "device.xml", params int[] ports)
         {
             if (ports.Length == 0)
