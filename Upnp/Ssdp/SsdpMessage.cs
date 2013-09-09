@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net;
 using Upnp.Extensions;
 using Upnp.Net;
@@ -8,34 +9,31 @@ namespace Upnp.Ssdp
     /// <summary>
     /// Class representing an SSDP request/response message
     /// </summary>
-    public class SsdpMessage
+    public class SsdpMessage : HttpMessage
     {
 
         #region Constructors
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="SsdpMessage"/> class.
+        /// Initializes a new instance of the <see cref="SsdpMessage" /> class.
         /// </summary>
-        /// <param name="message">The message.</param>
         /// <param name="source">The source.</param>
-        public SsdpMessage(HttpMessage message, IPEndPoint source)
+        public SsdpMessage(IPEndPoint source)
+            : base(true)
         {
-            this.Message = message;
             this.Source = source;
-            this.ParseMessageData();
         }
 
         #endregion
 
         #region Protected Methods
 
-        /// <summary>
-        /// Parses the message data.
-        /// </summary>
-        protected virtual void ParseMessageData()
+        protected override void FromStream(TextReader reader)
         {
+            base.FromStream(reader);
+
             // Parse out the type and UDN from the data
-            this.Type = this.Message.Headers.ValueOrDefault("NT", string.Empty);
+            this.Type = this.Headers.ValueOrDefault("NT", string.Empty);
             this.UDN = this.USN;
             int index = this.UDN.IndexOf("::");
             if (index != -1)
@@ -47,14 +45,21 @@ namespace Upnp.Ssdp
             }
 
             // Parse out the max age from the cache control
-            string cacheControl = this.Message.Headers.ValueOrDefault("CACHE-CONTROL", string.Empty).ToUpper();
+            var cacheControl = this.Headers.ValueOrDefault("CACHE-CONTROL", string.Empty).ToUpper();
+            var temp = 0;
             this.MaxAge = 0;
-            int temp = 0;
             if (cacheControl.StartsWith("MAX-AGE") && int.TryParse(cacheControl.Substring(8), out temp))
                 this.MaxAge = temp;
+            else
+            {
+                var mx = this.Headers.ValueOrDefault("MX", string.Empty);
+                if (int.TryParse(mx, out temp))
+                    this.MaxAge = temp;    
+            }
+                
+            
 
-
-            string date = this.Message.Headers.ValueOrDefault("DATE", string.Empty);
+            string date = this.Headers.ValueOrDefault("DATE", string.Empty);
             DateTime tempDt;
             if (string.IsNullOrEmpty(date) || !DateTime.TryParse(date, out tempDt))
                 this.DateGenerated = DateTime.Now;
@@ -65,18 +70,6 @@ namespace Upnp.Ssdp
         #endregion
 
         #region Properties
-
-        /// <summary>
-        /// Gets or sets the message.
-        /// </summary>
-        /// <value>
-        /// The message.
-        /// </value>
-        public HttpMessage Message
-        {
-            get;
-            protected set;
-        }
 
         /// <summary>
         /// Gets or sets the source.
@@ -98,7 +91,7 @@ namespace Upnp.Ssdp
         /// </value>
         public bool IsAlive
         {
-            get { return (this.Message.Headers.ValueOrDefault("NTS", string.Empty).ToLower() == Protocol.SsdpAliveNts.ToLower()); }
+            get { return (this.Headers.ValueOrDefault("NTS", string.Empty).ToLower() == Protocol.SsdpAliveNts.ToLower()); }
         }
 
         /// <summary>
@@ -109,7 +102,7 @@ namespace Upnp.Ssdp
         /// </value>
         public bool IsByeBye
         {
-            get { return (this.Message.Headers.ValueOrDefault("NTS", string.Empty).ToLower() == Protocol.SsdpByeByeNts.ToLower()); }
+            get { return (this.Headers.ValueOrDefault("NTS", string.Empty).ToLower() == Protocol.SsdpByeByeNts.ToLower()); }
         }
 
         /// <summary>
@@ -117,7 +110,7 @@ namespace Upnp.Ssdp
         /// </summary>
         public string USN
         {
-            get { return this.Message.Headers.ValueOrDefault("USN", string.Empty); }
+            get { return this.Headers.ValueOrDefault("USN", string.Empty); }
         }
 
         /// <summary>
@@ -161,7 +154,7 @@ namespace Upnp.Ssdp
         /// </summary>
         public string Location
         {
-            get { return this.Message.Headers.ValueOrDefault("LOCATION", string.Empty); }
+            get { return this.Headers.ValueOrDefault("LOCATION", string.Empty); }
         }
 
         /// <summary>
@@ -169,7 +162,7 @@ namespace Upnp.Ssdp
         /// </summary>
         public string Server
         {
-            get { return this.Message.Headers.ValueOrDefault("SERVER", string.Empty); }
+            get { return this.Headers.ValueOrDefault("SERVER", string.Empty); }
         }
 
         /// <summary>
@@ -180,7 +173,7 @@ namespace Upnp.Ssdp
         /// </value>
         public string SearchType
         {
-            get { return this.Message.Headers.ValueOrDefault("ST", string.Empty); }
+            get { return this.Headers.ValueOrDefault("ST", string.Empty); }
         }
 
         /// <summary>
@@ -240,6 +233,48 @@ namespace Upnp.Ssdp
         }
 
         #endregion
+
+        /// <summary>
+        /// Parses the specified stream.
+        /// </summary>
+        /// <param name="stream">The stream.</param>
+        /// <param name="endPoint">The end point.</param>
+        /// <returns></returns>
+        public static SsdpMessage Parse(Stream stream, IPEndPoint endPoint)
+        {
+            using (var reader = new StreamReader(stream))
+            {
+                return Parse(reader, endPoint);
+            }
+        }
+
+        /// <summary>
+        /// Parses the specified buffer.
+        /// </summary>
+        /// <param name="buffer">The buffer.</param>
+        /// <param name="length">The length.</param>
+        /// <param name="endPoint">The end point.</param>
+        /// <returns></returns>
+        public static SsdpMessage Parse(byte[] buffer, int length, IPEndPoint endPoint)
+        {
+            using (var stream = new MemoryStream(buffer, 0, length))
+            {
+                return Parse(stream, endPoint);
+            }
+        }
+
+        /// <summary>
+        /// Parses the specified reader.
+        /// </summary>
+        /// <param name="reader">The reader.</param>
+        /// <param name="endPoint">The end point.</param>
+        /// <returns></returns>
+        public static SsdpMessage Parse(TextReader reader, IPEndPoint endPoint)
+        {
+            var message = new SsdpMessage(endPoint);
+            message.FromStream(reader);
+            return message;
+        }
 
     }
 }

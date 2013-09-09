@@ -10,7 +10,6 @@ namespace Upnp.Net
     /// </summary>
     public class UdpServer : UdpClient
     {
-
         #region Constructors
 
         /// <summary>
@@ -18,9 +17,9 @@ namespace Upnp.Net
         /// </summary>
         /// <param name="localEp">The local ep.</param>
         public UdpServer(IPEndPoint localEp)
-            : base()
+            : base(localEp.AddressFamily)
         {
-            this.Client = this.CreateSocket(localEp);
+            this.Client = CreateSocket(localEp);
             this.Client.Bind(localEp);
         }
 
@@ -85,7 +84,7 @@ namespace Upnp.Net
         /// <returns></returns>
         protected virtual Socket CreateSocket(IPEndPoint localEp)
         {
-            return new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            return new Socket(localEp.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
         }
 
         /// <summary>
@@ -93,7 +92,7 @@ namespace Upnp.Net
         /// </summary>
         protected void BeginReceive()
         {
-            this.BeginReceive((ar) =>
+            this.BeginReceive(ar =>
             {
                 IPEndPoint remoteEp = new IPEndPoint(IPAddress.Any, 0);
                 byte[] buffer;
@@ -175,7 +174,13 @@ namespace Upnp.Net
         /// </summary>
         public IPEndPoint LocalEndpoint
         {
-            get { return this.Client.LocalEndPoint as IPEndPoint; }
+            get
+            {
+                if (this.Client == null)
+                    return null;
+
+                return this.Client.LocalEndPoint as IPEndPoint;
+            }
         }
 
         /// <summary>

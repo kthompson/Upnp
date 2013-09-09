@@ -8,34 +8,35 @@ using Upnp.Net;
 
 namespace Upnp.Ssdp
 {
-    public class SsdpSocket : UdpServer
+    public class SsdpSocket : UdpServer, ISsdpSocket
     {
-        
-        public SsdpSocket()
-            : this(new IPEndPoint(IPAddress.Any, 0))
+        public Uri Location { get; private set; }
+
+        #region Constructors
+
+        public SsdpSocket(IPAddress addr, Uri location = null)
+            : this(new IPEndPoint(addr, Protocol.DefaultPort), location)
         {
-            
         }
 
-        public SsdpSocket(IPEndPoint localEp)
+
+        public SsdpSocket(IPEndPoint localEp, Uri location = null)
             : base(localEp)
         {
+            this.Location = location ?? new UriBuilder { Scheme = "http", Host = localEp.Address.ToString(), Path = "device.xml"}.Uri;
         }
 
-        public virtual void JoinMulticastGroupAllInterfaces(IPEndPoint remoteEp)
+        #endregion
+
+        public void JoinMulticastGroup(IPEndPoint remoteEp)
         {
-            var localIps = IPAddressHelpers.GetUnicastAddresses(ip => ip.AddressFamily == remoteEp.AddressFamily && !IPAddress.IsLoopback(ip));
-            
-            foreach (var addr in localIps)
+            try
             {
-                try
-                {
-                    this.JoinMulticastGroup(remoteEp.Address, addr);
-                }
-                catch (SocketException)
-                {
-                    // If we're already joined to this group we'll throw an error so just ignore it
-                }
+                this.JoinMulticastGroup(remoteEp.Address, this.LocalEndpoint.Address);
+            }
+            catch (SocketException)
+            {
+                // If we're already joined to this group we'll throw an error so just ignore it
             }
         }
 
@@ -43,8 +44,7 @@ namespace Upnp.Ssdp
         {
             var sock = base.CreateSocket(localEp);
             sock.ReceiveBufferSize = 4096;
-            //sock.ExclusiveAddressUse = false;
-            sock.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            sock.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
             return sock;
         }
 
@@ -58,18 +58,22 @@ namespace Upnp.Ssdp
                 try
                 {
                     // Parse our message and fire our event
-                    using (var stream = new MemoryStream(args.Buffer, 0, args.Length))
-                    {
-                        this.OnSsdpMessageReceived(new SsdpMessage(HttpMessage.Parse(stream), args.RemoteIPEndpoint));
-                    }
+                    var msg = SsdpMessage.Parse(args.Buffer, args.Length, args.RemoteIPEndpoint);
+                    this.OnSsdpMessageReceived(msg);
                 }
                 catch (ArgumentException ex)
                 {
                     System.Diagnostics.Trace.TraceError("Failed to parse SSDP response: {0}", ex.ToString());
                 }
+                catch (Exception exception)
+                {
+                    System.Diagnostics.Trace.TraceError("Failed to parse SSDP response: {0}", exception.ToString());
+                }
             });
 
         }
+
+        #region Events
 
         /// <summary>
         /// Occurs when an SSDP message is received.
@@ -86,5 +90,7 @@ namespace Upnp.Ssdp
             if (handler != null)
                 handler(this, new EventArgs<SsdpMessage>(msg));
         }
+
+        #endregion
     }
 }

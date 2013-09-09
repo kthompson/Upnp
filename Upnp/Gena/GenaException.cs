@@ -12,5 +12,4 @@ namespace Upnp.Gena
             StatusCode = code;
         }
     }
-    
 }

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Text;
 using Upnp.Timers;
 
@@ -9,17 +11,17 @@ namespace Upnp.Ssdp
     /// <summary>
     /// Server class for sending out SSDP announcements and responding to searches
     /// </summary>
-    public class SsdpServer : SsdpListener
+    public class SsdpServer : SsdpListener, ISsdpServer
     {
-
         #region Constructor
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SsdpServer"/> class.
         /// </summary>
-        public SsdpServer()
+        public SsdpServer(params ISsdpSocket[] sockets)
+            : base(sockets)
         {
-            this.Announcers = new Dictionary<SsdpAnnouncer, bool>();
+            this.Announcers = new Dictionary<ISsdpAnnouncer, bool>();
         }
 
         #endregion
@@ -31,21 +33,30 @@ namespace Upnp.Ssdp
         /// </summary>
         /// <param name="respondToSearches">if set to <c>true</c> [respond to searches].</param>
         /// <returns></returns>
-        public SsdpAnnouncer CreateAnnouncer(bool respondToSearches = true)
+        public ISsdpAnnouncer CreateAnnouncer(bool respondToSearches = true)
         {
             lock (this.Announcers)
             {
-                var announcer = new SsdpAnnouncer(this.Server);
+                var announcer = new SsdpAnnouncer(this.Sockets.ToArray());
                 this.Announcers.Add(announcer, respondToSearches);
                 return announcer;
             }
+        }
+
+        public ISsdpAnnouncer CreateAnnouncer(string type, string usn, bool respondToSearches = true)
+        {
+            var ad = CreateAnnouncer(respondToSearches);
+            ad.NotificationType = type;
+            ad.USN = usn;
+            
+            return ad;
         }
 
         /// <summary>
         /// Removes the announcer.
         /// </summary>
         /// <param name="announcer">The announcer.</param>
-        public void RemoveAnnouncer(SsdpAnnouncer announcer)
+        public void RemoveAnnouncer(ISsdpAnnouncer announcer)
         {
             lock (this.Announcers)
             {
@@ -58,7 +69,7 @@ namespace Upnp.Ssdp
         /// </summary>
         /// <param name="announcer">The announcer.</param>
         /// <param name="respondToSearches">if set to <c>true</c> [respond to searches].</param>
-        public void SetSearchResponses(SsdpAnnouncer announcer, bool respondToSearches)
+        public void SetRespondsToSearches(ISsdpAnnouncer announcer, bool respondToSearches)
         {
             lock (this.Announcers)
             {
@@ -74,7 +85,7 @@ namespace Upnp.Ssdp
         /// </summary>
         /// <param name="msg">The MSG.</param>
         /// <returns></returns>
-        public IEnumerable<SsdpAnnouncer> GetMatchingResponders(SsdpMessage msg)
+        public IEnumerable<ISsdpAnnouncer> GetMatchingResponders(SsdpMessage msg)
         {
             lock (this.Announcers)
             {
@@ -92,6 +103,30 @@ namespace Upnp.Ssdp
             }
         }
 
+        public override void StopListening()
+        {
+            base.StopListening();
+
+            lock (this.Announcers)
+            {
+                foreach (var announcer in Announcers.Keys)
+                    announcer.Shutdown();
+
+                Announcers.Clear();
+            }
+        }
+
+        public override void StartListening(params IPEndPoint[] remoteEps)
+        {
+            base.StartListening(remoteEps);
+
+            lock (this.Announcers)
+            {
+                foreach (var announcer in Announcers.Keys)
+                    announcer.Start();
+            }
+        }
+
         #endregion
 
         #region Protected Methods
@@ -99,18 +134,20 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Sends the search response message.
         /// </summary>
-        protected void SendSearchResponse(SsdpMessage msg, SsdpAnnouncer announcer)
+        protected void SendSearchResponse(SsdpMessage msg, ISsdpAnnouncer announcer)
         {
-            lock (this.Server)
+            this.Sockets.ForEachSocket(socket =>
             {
                 // If we were stopped then don't bother sending this message
-                if (!this.Server.IsListening)
+                if (!socket.IsListening)
                     return;
 
-                byte[] bytes = Encoding.ASCII.GetBytes(Protocol.CreateAliveResponse(
-                    announcer.Location, msg.SearchType, announcer.USN, announcer.MaxAge, Protocol.DefaultUserAgent)); ;
-                this.Server.Send(bytes, bytes.Length, msg.Source);
-            }
+                var aliveResponse = Protocol.CreateAliveResponse(socket.Location.ToString(), msg.SearchType, announcer.USN, announcer.MaxAge, Protocol.DefaultUserAgent);
+                var bytes = Encoding.ASCII.GetBytes(aliveResponse); 
+
+                Trace.WriteLine(string.Format("Sending SearchResponse [{0}, {1}] from {2} to {3}", msg.SearchType, msg.USN, socket.LocalEndpoint, msg.Source), AppInfo.Application);
+                socket.Send(bytes, bytes.Length, msg.Source);
+            });
         }
 
         #endregion
@@ -119,6 +156,8 @@ namespace Upnp.Ssdp
 
         protected override void OnSsdpMessageReceived(SsdpMessage msg)
         {
+            base.OnSsdpMessageReceived(msg);
+            
             // Ignore any advertisements
             if (msg.IsAdvertisement)
                 return;
@@ -137,7 +176,7 @@ namespace Upnp.Ssdp
 
         protected static readonly TimeoutDispatcher Dispatcher = new TimeoutDispatcher();
 
-        protected Dictionary<SsdpAnnouncer, bool> Announcers
+        protected Dictionary<ISsdpAnnouncer, bool> Announcers
         {
             get;
             private set;
@@ -145,7 +184,13 @@ namespace Upnp.Ssdp
 
         public bool IsListening
         {
-            get { return this.Server.IsListening; }
+            get
+            {
+                if (this.Sockets.Count == 0)
+                    return false;
+
+                return this.Sockets.First().IsListening;
+            }
         }
 
         #endregion
@@ -157,6 +202,9 @@ namespace Upnp.Ssdp
             {
                 lock (this.Announcers)
                 {
+                    foreach (var announcer in this.Announcers.Keys)
+                        announcer.Dispose();
+
                     this.Announcers.Clear();
                 }
             }

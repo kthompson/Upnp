@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using Upnp.Extensions;
 using Upnp.Gena;
 using Upnp.Ssdp;
@@ -14,13 +15,15 @@ namespace Upnp.Upnp
 
         protected readonly SsdpServer SsdpServer;
         protected readonly GenaServer GenaServer;
-        protected readonly List<SsdpAnnouncer> Announcers = new List<SsdpAnnouncer>();
         
         public UpnpServer(UpnpRoot root, SsdpServer ssdp = null, GenaServer gena = null)
         {
             this.Root = root;
             this.Root.ChildDeviceAdded += OnChildDeviceAdded;
-            this.SsdpServer = ssdp ?? new SsdpServer();
+
+            var sockets = SsdpSocketFactory.BuildSockets().ToArray();
+
+            this.SsdpServer = ssdp ?? new SsdpServer(sockets);
             this.GenaServer = gena ?? new GenaServer();
 
             BuildAdvertisements();
@@ -31,13 +34,9 @@ namespace Upnp.Upnp
             BuildAdvertisementsForDevice(eventArgs.Value);
         }
 
-        protected SsdpAnnouncer CreateAdvertisement(string notificationType, string usn)
+        protected ISsdpAnnouncer CreateAdvertisement(string notificationType, string usn)
         {
-            var ad = this.SsdpServer.CreateAnnouncer();
-            ad.NotificationType = notificationType;
-            ad.USN = usn;
-            ad.Location = this.Root.DeviceDescriptionUrl.ToString();
-            Announcers.Add(ad);
+            var ad = this.SsdpServer.CreateAnnouncer(notificationType, usn);
             
             if(this.SsdpServer.IsListening)
                 ad.Start();
@@ -69,7 +68,7 @@ namespace Upnp.Upnp
                 BuildAdvertisementsForDevice(child);
         }
 
-        private void SetupOnRemovedHandler(UpnpDevice device, SsdpAnnouncer ad1, SsdpAnnouncer ad2)
+        private void SetupOnRemovedHandler(UpnpDevice device, ISsdpAnnouncer ad1, ISsdpAnnouncer ad2)
         {
             EventHandler<EventArgs<UpnpDevice>> onRemoved = null;
             onRemoved = (sender, args) =>
@@ -77,8 +76,8 @@ namespace Upnp.Upnp
                 ad1.Shutdown();
                 ad2.Shutdown();
 
-                this.Announcers.Remove(ad1);
-                this.Announcers.Remove(ad2);
+                this.SsdpServer.RemoveAnnouncer(ad1);
+                this.SsdpServer.RemoveAnnouncer(ad2);
 
                 device.Removed -= onRemoved;
             };
@@ -95,7 +94,7 @@ namespace Upnp.Upnp
             {
                 ad.Shutdown();
 
-                this.Announcers.Remove(ad);
+                this.SsdpServer.RemoveAnnouncer(ad);
 
                 service.Removed -= onRemoved;
             };
@@ -106,17 +105,11 @@ namespace Upnp.Upnp
         public void StopListening()
         {
             this.SsdpServer.StopListening();
-
-            foreach (var announcer in Announcers)
-                announcer.Shutdown();
         }
 
         public void StartListening(params IPEndPoint[] remoteEps)
         {
             this.SsdpServer.StartListening(remoteEps);
-
-            foreach (var announcer in Announcers)
-                announcer.Start();
         }
 
         public void Dispose()

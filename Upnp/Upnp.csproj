@@ -46,9 +46,14 @@
     <Compile Include="Gena\GenaException.cs" />
     <Compile Include="Gena\GenaMessage.cs" />
     <Compile Include="Gena\GenaProperty.cs" />
+    <Compile Include="Gena\GenaPropertyInt32.cs" />
+    <Compile Include="Gena\GenaPropertySet.cs" />
+    <Compile Include="Gena\GenaPropertyXml.cs" />
     <Compile Include="Gena\GenaServer.cs" />
     <Compile Include="Gena\GenaSubscription.cs" />
     <Compile Include="Gena\GenaSubscriptionList.cs" />
+    <Compile Include="Gena\IGenaProperty.cs" />
+    <Compile Include="Gena\IGenaPropertySet.cs" />
     <Compile Include="Gena\IGenaSocket.cs" />
     <Compile Include="Gena\Protocol.cs" />
     <Compile Include="Net\HttpMessage.cs" />
@@ -56,6 +61,11 @@
     <Compile Include="Net\NetworkData.cs" />
     <Compile Include="Net\UdpServer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Ssdp\ISsdpAnnouncer.cs" />
+    <Compile Include="Ssdp\ISsdpClient.cs" />
+    <Compile Include="Ssdp\ISsdpListener.cs" />
+    <Compile Include="Ssdp\ISsdpServer.cs" />
+    <Compile Include="Ssdp\ISsdpSocket.cs" />
     <Compile Include="Ssdp\Protocol.cs" />
     <Compile Include="Ssdp\SsdpAnnouncer.cs" />
     <Compile Include="Ssdp\SsdpClient.cs" />
@@ -64,6 +74,8 @@
     <Compile Include="Ssdp\SsdpSearch.cs" />
     <Compile Include="Ssdp\SsdpServer.cs" />
     <Compile Include="Ssdp\SsdpSocket.cs" />
+    <Compile Include="Ssdp\SsdpSocketCollection.cs" />
+    <Compile Include="Ssdp\SsdpSocketFactory.cs" />
     <Compile Include="Timers\TimeoutDispatcher.cs" />
     <Compile Include="Upnp\UniqueDeviceName.cs" />
     <Compile Include="Upnp\UpnpAction.cs" />
@@ -77,6 +89,7 @@
     <Compile Include="Upnp\UpnpServiceDescription.cs" />
     <Compile Include="Upnp\UpnpStateVariable.cs" />
     <Compile Include="Upnp\UpnpType.cs" />
+    <Compile Include="Version.cs" />
     <Compile Include="Xml\XmlHelper.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

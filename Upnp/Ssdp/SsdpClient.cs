@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Upnp.Ssdp
 {
     /// <summary>
     /// Class to combine the functionality of SsdpListener and SsdpSearch
     /// </summary>
-    public class SsdpClient : SsdpListener
+    public class SsdpClient : SsdpListener, ISsdpClient
     {
 
         #region Constructors
@@ -14,7 +15,8 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Initializes a new instance of the <see cref="SsdpClient"/> class.
         /// </summary>
-        public SsdpClient()
+        public SsdpClient(params ISsdpSocket[] sockets)
+            : base(sockets)
         {
         }
 
@@ -28,10 +30,10 @@ namespace Upnp.Ssdp
         /// <returns></returns>
         public virtual SsdpSearch CreateSearch(bool requireUniqueLocation)
         {
-            var search = new SsdpSearch();
+            var search = new SsdpSearch(this.Sockets.ToArray());
 
-            Dictionary<string, SsdpMessage> dict = new Dictionary<string, SsdpMessage>();
-            search.Filter = (msg) =>
+            var dict = new Dictionary<string, SsdpMessage>();
+            search.Filter = msg =>
             {
                 lock (dict)
                 {
@@ -50,7 +52,7 @@ namespace Upnp.Ssdp
 
             search.ResultFound += (sender, e) =>
             {
-                this.OnSsdpMessageReceived(e.Value);
+                this.OnSsdpMessageReceived(sender, e);
                 this.OnSearchResponse(sender, e);   
             };
 

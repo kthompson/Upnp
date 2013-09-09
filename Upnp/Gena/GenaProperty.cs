@@ -4,52 +4,10 @@ using System.ComponentModel;
 using System.IO;
 using System.Xml;
 using System.Xml.Schema;
-using System.Xml.Serialization;
 using Upnp.Xml;
 
 namespace Upnp.Gena
 {
-    public interface IGenaProperty : INotifyPropertyChanged, IXmlSerializable
-    {
-        string Name { get; }
-        string ServiceId { get; }
-    }
-
-    public interface IGenaProperty<T> : IGenaProperty
-    {
-        T Value { get; set; }
-    }
-
-    public class GenaPropertySet : IXmlSerializable
-    {
-        private readonly Dictionary<string, IGenaProperty> _properties = new Dictionary<string, IGenaProperty>();
-
-        public XmlSchema GetSchema()
-        {
-            return null;
-        }
-
-        public void ReadXml(XmlReader reader)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void WriteXml(XmlWriter writer)
-        {
-            writer.WriteStartElement("propertyset");
-
-            foreach (var property in _properties.Values)
-                property.WriteXml(writer);
-
-            writer.WriteEndElement(); //propertyset
-        }
-
-        public void Add(IGenaProperty property)
-        {
-            _properties[property.Name] = property;
-        }
-    }
-
     public abstract class GenaProperty<T> : IGenaProperty<T>
     {
         protected GenaProperty(string serviceId, string name, T value = default(T))
@@ -110,42 +68,6 @@ namespace Upnp.Gena
             WriteValueXml(writer, this.Value);
             writer.WriteEndElement();
             writer.WriteEndElement();
-        }
-    }
-
-    public class GenaPropertyInt32 : GenaProperty<int>
-    {
-        public GenaPropertyInt32(string serviceId, string name, int value = 0)
-            : base(serviceId, name, value)
-        {
-        }
-
-        protected override int ReadValueXml(XmlReader reader)
-        {
-            return reader.ReadElementContentAsInt();
-        }
-
-        protected override void WriteValueXml(XmlWriter writer, int value)
-        {
-            writer.WriteValue(value);
-        }
-    }
-
-    public class GenaPropertyXml : GenaProperty<string>
-    {
-        public GenaPropertyXml(string serviceId, string name, string value = null)
-            : base(serviceId, name, value)
-        {
-        }
-
-        protected override string ReadValueXml(XmlReader reader)
-        {
-            return reader.ReadElementContentAsString();
-        }
-
-        protected override void WriteValueXml(XmlWriter writer, string value)
-        {
-            writer.WriteRaw(value);
         }
     }
 }

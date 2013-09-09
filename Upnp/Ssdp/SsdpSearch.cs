@@ -13,7 +13,7 @@ namespace Upnp.Ssdp
     /// <summary>
     /// Class representing an SSDP Search
     /// </summary>
-    public class SsdpSearch : IDisposable
+    public class SsdpSearch
     {
 
         #region Constructors
@@ -21,15 +21,12 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Initializes a new instance of the <see cref="SsdpSearch"/> class.
         /// </summary>
-        public SsdpSearch(SsdpSocket server = null)
+        public SsdpSearch(params ISsdpSocket[] sockets)
         {
-            if (server == null)
-            {
-                server = new SsdpSocket();
-                this.OwnsServer = true;
-            }
+            if (sockets.Length == 0)
+                sockets = SsdpSocketFactory.BuildSockets().ToArray();
 
-            this.Server = server;
+            this.Sockets = new SsdpSocketCollection(sockets);
             this.HostEndpoint = Protocol.DiscoveryEndpoints.IPv4;
             this.SearchType = Protocol.SsdpAll;
             this.Mx = Protocol.DefaultMx;
@@ -94,7 +91,7 @@ namespace Upnp.Ssdp
         /// <returns></returns>
         public List<SsdpMessage> Search(params IPEndPoint[] destinations)
         {
-            List<SsdpMessage> results = new List<SsdpMessage>();
+            var results = new List<SsdpMessage>();
             EventHandler<EventArgs<SsdpMessage>> resultHandler = (sender, e) =>
             {
                 lock (results)
@@ -150,7 +147,7 @@ namespace Upnp.Ssdp
                     throw new InvalidOperationException("Search is already in progress.");
 
                 this.IsSearching = true;
-                this.Server.DataReceived += OnServerDataReceived;
+                this.Sockets.ForEachSocket(socket => socket.SsdpMessageReceived += OnSsdpMessageReceived);
 
                 // TODO: Come up with a good calculation for this
                 // Just double our mx value for the timeout for now
@@ -159,31 +156,27 @@ namespace Upnp.Ssdp
 
             // If no destinations were specified then default to the IPv4 discovery
             if (destinations == null || destinations.Length == 0)
-                destinations = new IPEndPoint[] { Protocol.DiscoveryEndpoints.IPv4 };
+                destinations = new[] { Protocol.DiscoveryEndpoints.IPv4 };
 
             // Start the server
-            this.Server.StartListening();
-
-            // Do we really need to join the multicast group to send out multicast messages? Seems that way...
-            foreach (IPEndPoint dest in destinations.Where(ep => IPAddressHelpers.IsMulticast(ep.Address)))
-                this.Server.JoinMulticastGroupAllInterfaces(dest);
-
-            // If we're sending out any searches to the broadcast address then be sure to enable broadcasts
-            if (!this.Server.EnableBroadcast)
-                this.Server.EnableBroadcast = destinations.Any(ep => ep.Address.Equals(IPAddress.Broadcast));
+            this.Sockets.StartListening(destinations);
 
             // Now send out our search data
-            foreach (IPEndPoint dest in destinations)
+            foreach (var dest in destinations)
             {
                 // Make sure we respect our option as to whether we use the destination as the host value
-                IPEndPoint host = (this.UseRemoteEndpointAsHost ? dest : this.HostEndpoint);
-                string req = Protocol.CreateDiscoveryRequest(host, this.SearchType, this.Mx);
-                byte[] bytes = Encoding.ASCII.GetBytes(req);
-
+                var host = (this.UseRemoteEndpointAsHost ? dest : this.HostEndpoint);
+                var req = Protocol.CreateDiscoveryRequest(host, this.SearchType, this.Mx);
+                var bytes = Encoding.ASCII.GetBytes(req);
+                var dest1 = dest;
+                
                 // TODO: Should we make this configurable?
                 // NOTE: It's recommended to send two searches
-                this.Server.Send(bytes, bytes.Length, dest);
-                this.Server.Send(bytes, bytes.Length, dest);
+                this.Sockets.ForEachSocket(socket =>
+                {
+                    socket.Send(bytes, bytes.Length, dest1);
+                    socket.Send(bytes, bytes.Length, dest1);
+                });
             }
         }
 
@@ -206,11 +199,7 @@ namespace Upnp.Ssdp
                 }
 
                 // Cleanup our handler and notify everyone that we're done
-                this.Server.DataReceived -= OnServerDataReceived;
-
-                // If this is our server then go ahead and stop listening
-                if (this.OwnsServer)
-                    this.Server.StopListening();
+                this.Sockets.ForEachSocket(socket => socket.SsdpMessageReceived -= OnSsdpMessageReceived);
 
                 this.IsSearching = false;
                 this.OnSearchComplete();
@@ -294,18 +283,14 @@ namespace Upnp.Ssdp
         /// </summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs{T}.Core.Net.NetworkData&gt;"/> instance containing the event data.</param>
-        protected virtual void OnServerDataReceived(object sender, EventArgs<NetworkData> e)
+        protected virtual void OnSsdpMessageReceived(object sender, EventArgs<SsdpMessage> e)
         {
             // Queue this response to be processed
             ThreadPool.QueueUserWorkItem(data =>
             {
                 try
                 {
-                    // Parse our message and fire our event
-                    using (var stream = new MemoryStream(e.Value.Buffer, 0, e.Value.Length))
-                    {
-                        this.OnResultFound(new SsdpMessage(HttpMessage.Parse(stream), e.Value.RemoteIPEndpoint));
-                    }
+                    this.OnResultFound(e.Value);
                 }
                 catch (ArgumentException ex)
                 {
@@ -345,7 +330,7 @@ namespace Upnp.Ssdp
                 return;
 
             // If this is not a notify message then ignore it
-            if (result.Message.IsRequest)
+            if (result.IsRequest)
                 return;
 
             // Check to make sure this message matches our filter
@@ -378,24 +363,12 @@ namespace Upnp.Ssdp
         }
 
         /// <summary>
-        /// Gets or sets a value indicating whether [owns server].
-        /// </summary>
-        /// <value>
-        ///   <c>true</c> if [owns server]; otherwise, <c>false</c>.
-        /// </value>
-        protected bool OwnsServer
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
         /// Gets or sets the server.
         /// </summary>
         /// <value>
         /// The server.
         /// </value>
-        protected SsdpSocket Server
+        protected SsdpSocketCollection Sockets
         {
             get;
             set;
@@ -474,20 +447,5 @@ namespace Upnp.Ssdp
         }
 
         #endregion
-
-        #region IDisposable Interface
-
-        /// <summary>
-        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
-        /// </summary>
-        public virtual void Dispose()
-        {
-            // Only close the server if we created it
-            if (this.OwnsServer)
-                this.Server.Close();
-        }
-
-        #endregion
-
     }
 }

@@ -8,20 +8,22 @@ namespace Upnp.Ssdp
     /// </summary>
     public static class Protocol
     {
+        
         /// <summary>
         /// Class containing all the IPEndPoints used in discovery
         /// </summary>
         public static class DiscoveryEndpoints
         {
-            public static readonly IPEndPoint IPv4 = new IPEndPoint(IPAddress.Parse("239.255.255.250"), 1900);
-            public static readonly IPEndPoint Broadcast = new IPEndPoint(IPAddress.Broadcast, 1900);
-            public static readonly IPEndPoint IPv6LinkLocal = new IPEndPoint(IPAddress.Parse("FF02::C"), 1900);
-            public static readonly IPEndPoint IPv6SiteLocal = new IPEndPoint(IPAddress.Parse("FF05::C"), 1900);
-            public static readonly IPEndPoint IPv6OrganizationLocal = new IPEndPoint(IPAddress.Parse("FF08::C"), 1900);
-            public static readonly IPEndPoint IPv6Global = new IPEndPoint(IPAddress.Parse("FF0E::C"), 1900);
+            public static readonly IPEndPoint IPv4 = new IPEndPoint(IPAddress.Parse("239.255.255.250"), DefaultPort);
+            public static readonly IPEndPoint Broadcast = new IPEndPoint(IPAddress.Broadcast, DefaultPort);
+            public static readonly IPEndPoint IPv6LinkLocal = new IPEndPoint(IPAddress.Parse("FF02::C"), DefaultPort);
+            public static readonly IPEndPoint IPv6SiteLocal = new IPEndPoint(IPAddress.Parse("FF05::C"), DefaultPort);
+            public static readonly IPEndPoint IPv6OrganizationLocal = new IPEndPoint(IPAddress.Parse("FF08::C"), DefaultPort);
+            public static readonly IPEndPoint IPv6Global = new IPEndPoint(IPAddress.Parse("FF0E::C"), DefaultPort);
         }
 
-        public const string DefaultUserAgent = "UpnpSsdp/0.1";
+        public const int DefaultPort = 1900;
+        public static readonly string DefaultUserAgent = AppInfo.Application + "/0.1";
 
         public const string SsdpSearchMethod = "M-SEARCH";
         public const string GenaNotifyMethod = "NOTIFY";

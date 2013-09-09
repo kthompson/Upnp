@@ -11,34 +11,26 @@ using Upnp.Timers;
 
 namespace Upnp.Ssdp
 {
-
     /// <summary>
     /// Class for announcing SSDP messages (Alive/ByeByes)
     /// </summary>
-    public class SsdpAnnouncer : IDisposable
+    class SsdpAnnouncer : ISsdpAnnouncer
     {
 
         #region Constructors
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="SsdpAnnouncer"/> class.
+        /// Initializes a new instance of the <see cref="SsdpAnnouncer" /> class.
         /// </summary>
-        /// <param name="server">The server.</param>
-        public SsdpAnnouncer(SsdpSocket server = null)
+        /// <param name="sockets">The sockets.</param>
+        public SsdpAnnouncer(params ISsdpSocket[] sockets)
         {
-            if (server == null)
-            {
-                server = new SsdpSocket();
-                this.OwnsServer = true;
-            }
-
-            this.Server = server;
+            this.Sockets = sockets;
             this.UserAgent = Protocol.DefaultUserAgent;
             this.MaxAge = Protocol.DefaultMaxAge;
             this.NotificationType = string.Empty;
-            this.Location = string.Empty;
             this.USN = string.Empty;
-            this.RemoteEndPoints = new SyncCollection<IPEndPoint>() { Protocol.DiscoveryEndpoints.IPv4, Protocol.DiscoveryEndpoints.Broadcast };
+            this.RemoteEndPoints = new SyncCollection<IPEndPoint> { Protocol.DiscoveryEndpoints.IPv4, Protocol.DiscoveryEndpoints.Broadcast };
         }
 
         #endregion
@@ -56,9 +48,23 @@ namespace Upnp.Ssdp
                 if (this.IsRunning)
                     return;
 
-                // Send our initial alive message adding an initial random delay between 0-100ms;
-                Dispatcher.Add(() => this.SendSyncAliveMessage(), TimeSpan.FromSeconds(new Random().Next(0, 100)));
-                Dispatcher.Add(() => this.SendSyncAliveMessage(), TimeSpan.FromSeconds(new Random().Next(0, 100)));
+                /* UPnP Spec 1.1.2: Devices SHOULD wait a random interval (e.g. between 0 and 100milliseconds) before sending an initial
+                 * set of advertisements in order to reduce the likelihood of network storms; this random interval SHOULD also be applied 
+                 * on occasions where the device obtains a new IP address or a new UPnP-enabled interface is installed.
+                 * 
+                 * Due to the unreliable nature of UDP, devices SHOULD send the entire set of discovery messages more than once with some 
+                 * delay between sets e.g. a few hundred milliseconds.
+                 */
+                var random = new Random();
+
+                this.TimeoutTokens.Add(Dispatcher.Add(() =>
+                {
+                    this.SendSyncAliveMessage();
+                        
+                    // add second advert for 200ms from now:
+                    this.TimeoutTokens.Add(Dispatcher.Add(() => this.SendSyncAliveMessage(), TimeSpan.FromMilliseconds(200)));
+                }, TimeSpan.FromMilliseconds(random.Next(0, 100))));
+                
 
                 StartAnnouncer();
             }
@@ -70,17 +76,17 @@ namespace Upnp.Ssdp
             {
                 // Create a new timeout to send out SSDP alive messages
                 // Also make sure we kick the first one off semi-instantly
-                this.TimeoutToken = Dispatcher.Add(() =>
+                this.TimeoutTokens.Add(Dispatcher.Add(() =>
                 {
                     if (!SendSyncAliveMessage())
                     {
-                        Trace.WriteLine(string.Format("Stopping Dispatcher for {0}", this.USN), "SSDP");
+                        Trace.WriteLine(string.Format("Stopping Dispatcher for {0}", this.USN), AppInfo.Application);
                         return;
                     }
 
                     
                     StartAnnouncer();
-                }, GetNextAdvertWaitTime());
+                }, GetNextAdvertWaitTime()));
             }
         }
 
@@ -99,7 +105,13 @@ namespace Upnp.Ssdp
 
         private TimeSpan GetNextAdvertWaitTime()
         {
-            return TimeSpan.FromSeconds(new Random().Next(this.MaxAge/4, this.MaxAge/2));
+            /* UPnP Spec 1.1.2: In addition, the device MUST re-send its advertisements periodically prior to expiration of the duration specified in
+             * the CACHE-CONTROL header field; it is RECOMMENDED that such refreshing of advertisements be done at a randomly-distributed interval of 
+             * less than one-half of the advertisement expiration time, so as to provide the opportunity for recovery from lost advertisements before 
+             * the advertisement expires, and to distribute over time the advertisement refreshment of multiple devices on the network in order to 
+             * avoid spikes in network traffic.
+             */
+            return TimeSpan.FromSeconds(new Random().Next(this.MaxAge/3, this.MaxAge/2));
         }
 
         /// <summary>
@@ -114,8 +126,11 @@ namespace Upnp.Ssdp
                     return;
 
                 // Kill our timeout token
-                this.TimeoutToken.Dispose();
-                this.TimeoutToken = null;
+                foreach (var token in this.TimeoutTokens)
+                    token.Dispose();
+
+                this.TimeoutTokens.Clear();
+                this.TimeoutTokens = null;
 
                 // Now send our bye bye message
                 this.SendByeByeMessage();
@@ -127,11 +142,14 @@ namespace Upnp.Ssdp
         /// </summary>
         public void SendAliveMessage()
         {
-            Parallel.ForEach(this.RemoteEndPoints.ToArray(), ep =>
+            ForEachRemoteEndPoint((ep, socket) =>
             {
-                var notify = Protocol.CreateAliveNotify(ep, this.Location, this.NotificationType, this.USN, this.MaxAge, this.UserAgent);
+                Trace.WriteLine(string.Format("DeviceAlive [{0}, {1}] from {2} to {3}", this.NotificationType, this.USN, socket.LocalEndpoint, ep), AppInfo.Application);
+
+                var notify = Protocol.CreateAliveNotify(ep, socket.Location.ToString(), this.NotificationType, this.USN, this.MaxAge, this.UserAgent);
                 var bytes = Encoding.ASCII.GetBytes(notify);
-                this.Server.Send(bytes, bytes.Length, ep);
+
+                socket.Send(bytes, bytes.Length, ep);
             });
         }
 
@@ -140,14 +158,34 @@ namespace Upnp.Ssdp
         #region Protected Methods
 
         /// <summary>
+        /// Fors the each remote end point.
+        /// </summary>
+        /// <param name="action">The action.</param>
+        protected void ForEachRemoteEndPoint(Action<IPEndPoint, ISsdpSocket> action)
+        {
+            Parallel.ForEach(this.RemoteEndPoints.ToArray(), ep =>
+            {
+                foreach (var socket in Sockets)
+                {
+                    var localEp = socket.LocalEndpoint;
+                    if (localEp == null || localEp.AddressFamily != ep.AddressFamily)
+                        continue;
+
+                    action(ep, socket);
+                }
+            });
+        }
+
+        /// <summary>
         /// Sends the bye bye message.
         /// </summary>
         protected void SendByeByeMessage()
         {
-            Parallel.ForEach(this.RemoteEndPoints.ToArray(), ep =>
+            ForEachRemoteEndPoint((ep, socket) =>
             {
                 var bytes = Encoding.ASCII.GetBytes(Protocol.CreateByeByeNotify(ep, this.NotificationType, this.USN));
-                this.Server.Send(bytes, bytes.Length, ep);
+                Trace.WriteLine(string.Format("DeviceByeBye [{0}, {1}] from {2} to {3}", this.NotificationType, this.USN, socket.LocalEndpoint, ep), AppInfo.Application);
+                socket.Send(bytes, bytes.Length, ep);
             });
         }
         
@@ -157,7 +195,7 @@ namespace Upnp.Ssdp
 
         protected readonly object SyncRoot = new object();
         protected static readonly TimeoutDispatcher Dispatcher = new TimeoutDispatcher();
-        protected IDisposable TimeoutToken = null;
+        protected List<IDisposable> TimeoutTokens = new List<IDisposable>();
 
         /// <summary>
         /// Gets or sets the server.
@@ -165,19 +203,7 @@ namespace Upnp.Ssdp
         /// <value>
         /// The server.
         /// </value>
-        protected SsdpSocket Server
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether [owns server].
-        /// </summary>
-        /// <value>
-        ///   <c>true</c> if [owns server]; otherwise, <c>false</c>.
-        /// </value>
-        protected bool OwnsServer
+        protected ISsdpSocket[] Sockets
         {
             get;
             set;
@@ -191,7 +217,7 @@ namespace Upnp.Ssdp
         /// </value>
         public bool IsRunning
         {
-            get { return this.TimeoutToken != null; }
+            get { return this.TimeoutTokens != null && this.TimeoutTokens.Count > 0; }
         }
 
         /// <summary>
@@ -201,18 +227,6 @@ namespace Upnp.Ssdp
         {
             get;
             private set;
-        }
-
-        /// <summary>
-        /// Gets or sets the location.
-        /// </summary>
-        /// <value>
-        /// The location.
-        /// </value>
-        public string Location
-        {
-            get;
-            set;
         }
 
         /// <summary>
@@ -273,9 +287,6 @@ namespace Upnp.Ssdp
         public void Dispose()
         {
             this.Shutdown();
-
-            if (this.OwnsServer)
-                this.Server.Close();
         }
 
         #endregion

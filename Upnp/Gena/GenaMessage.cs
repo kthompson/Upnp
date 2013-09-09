@@ -5,22 +5,22 @@ using Upnp.Net;
 
 namespace Upnp.Gena
 {
-    public class GenaMessage
+    public class GenaMessage  : HttpMessage
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="GenaMessage"/> class.
         /// </summary>
         /// <param name="isRequest">if set to <c>true</c> [is request].</param>
         protected GenaMessage(bool isRequest)
+            : base(isRequest)
         {
-            this.Message = isRequest ? HttpMessage.CreateRequest() : HttpMessage.CreateResponse();
         }
 
         /// <summary>
         /// Creates the request.
         /// </summary>
         /// <returns></returns>
-        public static GenaMessage CreateRequest()
+        public new static GenaMessage CreateRequest()
         {
             return new GenaMessage(true);
         }
@@ -29,23 +29,21 @@ namespace Upnp.Gena
         /// Creates the response.
         /// </summary>
         /// <returns></returns>
-        public static GenaMessage CreateResponse()
+        public new static GenaMessage CreateResponse()
         {
             return new GenaMessage(false);
         }
-
-        public HttpMessage Message { get; protected set; }
-
+        
         public string EventUrl
         {
-            get { return this.Message.DirectiveObj; }
-            set { this.Message.DirectiveObj = value; }
+            get { return this.DirectiveObj; }
+            set { this.DirectiveObj = value; }
         }
 
         public string SubscriptionId
         {
             get { 
-                var sid = this.Message.Headers["sid"]; 
+                var sid = this.Headers["sid"]; 
                 if(sid == null)
                     return null;
                 
@@ -55,28 +53,28 @@ namespace Upnp.Gena
             {
                 if(value == null)
                 {
-                    this.Message.Headers.Remove("sid");
+                    this.Headers.Remove("sid");
                     return;
                 }
 
                 if (value.StartsWith("uuid:"))
-                    this.Message.Headers["sid"] = value;
+                    this.Headers["sid"] = value;
                 else
-                    this.Message.Headers["sid"] = string.Format("uuid:{0}", value);
+                    this.Headers["sid"] = string.Format("uuid:{0}", value);
             }
         }
 
         public string NotificationType
         {
-            get { return this.Message.Headers["nt"]; }
-            set { this.Message.Headers["nt"] = value; }
+            get { return this.Headers["nt"]; }
+            set { this.Headers["nt"] = value; }
         }
 
         public Uri[] Callbacks
         {
             get
             {
-                var callbacks = this.Message.Headers["callback"];
+                var callbacks = this.Headers["callback"];
                 if(string.IsNullOrEmpty(callbacks))
                     return null;
 
@@ -86,7 +84,7 @@ namespace Upnp.Gena
             {
                 if(value == null)
                 {
-                    this.Message.Headers.Remove("callback");
+                    this.Headers.Remove("callback");
                     return;
                 }
 
@@ -100,7 +98,7 @@ namespace Upnp.Gena
                 if (sb.Length > 0)
                     sb.Length -= 2;
 
-                this.Message.Headers["callback"] = sb.ToString();
+                this.Headers["callback"] = sb.ToString();
             }
 
         }
@@ -109,7 +107,7 @@ namespace Upnp.Gena
         {
             get
             {
-                var value = this.Message.Headers["timeout"];
+                var value = this.Headers["timeout"];
 
                 if (value == null)
                     return null;
@@ -132,7 +130,7 @@ namespace Upnp.Gena
             {
                 if(value == null)
                 {
-                    this.Message.Headers.Remove("timeout");
+                    this.Headers.Remove("timeout");
                     return;
                 }
 
@@ -148,39 +146,39 @@ namespace Upnp.Gena
                     timeoutString = "Second-" + timeout.TotalSeconds;
                 }
 
-                this.Message.Headers["timeout"] = timeoutString;
+                this.Headers["timeout"] = timeoutString;
             }
         }
 
         public string UserAgent
         {
-            get { return this.Message.Headers["server"]; }
+            get { return this.Headers["server"]; }
             set
             {
                 if(string.IsNullOrEmpty(value ))
                 {
-                    this.Message.Headers.Remove("server");
+                    this.Headers.Remove("server");
                     return;
                 }
 
-                this.Message.Headers["server"] = value;
+                this.Headers["server"] = value;
             }
         }
 
         public bool IsSubscribe
         {
-            get { return this.Message.Directive.ToLower() == "subscribe" && string.IsNullOrEmpty(this.Message.Headers["sid"]); }
+            get { return this.Directive.ToLower() == "subscribe" && string.IsNullOrEmpty(this.Headers["sid"]); }
             
         }
 
         public bool IsRenewal
         {
-            get { return this.Message.Directive.ToLower() == "subscribe" && !string.IsNullOrEmpty(this.Message.Headers["sid"]); }
+            get { return this.Directive.ToLower() == "subscribe" && !string.IsNullOrEmpty(this.Headers["sid"]); }
         }
 
         public bool IsUnsubscribe
         {
-            get { return this.Message.Directive.ToLower() == "unsubscribe"; }
+            get { return this.Directive.ToLower() == "unsubscribe"; }
 
         }
 
@@ -188,12 +186,12 @@ namespace Upnp.Gena
         {
             get
             {
-                if (string.IsNullOrEmpty(this.Message.Headers["date"]))
+                if (string.IsNullOrEmpty(this.Headers["date"]))
                     return null;
 
                 DateTime date;
 
-                if (DateTime.TryParse(this.Message.Headers["date"], out date))
+                if (DateTime.TryParse(this.Headers["date"], out date))
                     return date;
 
                 return null;
@@ -202,11 +200,11 @@ namespace Upnp.Gena
             { 
                 if(value == null)
                 {
-                    this.Message.Headers.Remove("date");
+                    this.Headers.Remove("date");
                     return;
                 }
 
-                this.Message.Headers["date"] = value.Value.ToString("r");
+                this.Headers["date"] = value.Value.ToString("r");
             }
         }
     }
