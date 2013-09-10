@@ -52,6 +52,18 @@ namespace Upnp.Ssdp
         }
 
         /// <summary>
+        /// Gets a value indicating whether this instance is listening.
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if this instance is listening; otherwise, <c>false</c>.
+        /// </value>
+        public bool IsListening
+        {
+            get { return this.Sockets.IsListening; }
+        }
+
+
+        /// <summary>
         /// Starts listening on the specified remote endpoints.
         /// </summary>
         /// <param name="groups">The remote eps.</param>

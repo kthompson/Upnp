@@ -12,6 +12,14 @@ namespace Upnp.Ssdp
         /// The filter.
         /// </value>
         Func<SsdpMessage, bool> Filter { get; set; }
+
+        /// <summary>
+        /// Gets a value indicating whether this instance is listening.
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if this instance is listening; otherwise, <c>false</c>.
+        /// </value>
+        bool IsListening { get; }
         
         /// <summary>
         /// Starts listening on the specified remote endpoints.

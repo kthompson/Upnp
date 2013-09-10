@@ -60,6 +60,17 @@ namespace Upnp.Ssdp
         #region Public Helper Methods
 
         /// <summary>
+        /// Gets a value indicating whether this instance is listening.
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if this instance is listening; otherwise, <c>false</c>.
+        /// </value>
+        public bool IsListening
+        {
+            get { return this.Any(socket => socket.IsListening); }
+        }
+
+        /// <summary>
         /// Stops listening on all sockets.
         /// </summary>
         public virtual void StopListening()
