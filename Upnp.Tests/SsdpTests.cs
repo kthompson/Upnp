@@ -158,6 +158,24 @@ namespace Upnp.Tests
         }
 
         [Test]
+        public void SynchronousAnnouncementTest()
+        {
+            using (var client = new SsdpClient())
+            using (var server = new SsdpServer())
+            {
+                client.Filter = message => message.Type == "urn:schemas-upnp-org:service:test:1";
+                client.StartListening();
+
+                server.CreateAnnouncer("urn:schemas-upnp-org:service:test:1", "uuid:979F4CE8-64AF-4653-B207-D7514908356F::urn:schemas-upnp-org:service:test:1");
+                server.StartListening();
+
+                var result = client.FindFirst(TimeSpan.FromSeconds(30));
+                Assert.IsNotNull(result);
+                Assert.That(IsTestAnnouncement(result));
+            }
+        }
+
+        [Test]
         public void FilteredAnnouncementTest()
         {
             using (var client = new SsdpClient())
