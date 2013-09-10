@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using Mono.Net;
 using Upnp.Extensions;
 using Upnp.Gena;
 using Upnp.Ssdp;
+using HttpListener = Mono.Net.HttpListener;
 
 namespace Upnp.Upnp
 {
@@ -16,7 +18,7 @@ namespace Upnp.Upnp
         protected readonly ISsdpServer SsdpServer;
         protected readonly GenaServer GenaServer;
         
-        public UpnpServer(UpnpRoot root, ISsdpServer ssdp = null, GenaServer gena = null)
+        public UpnpServer(UpnpRoot root, int port = 49152, ISsdpServer ssdp = null, GenaServer gena = null)
         {
             this.Root = root;
             this.Root.ChildDeviceAdded += OnChildDeviceAdded;

@@ -11,6 +11,13 @@ namespace Upnp.Upnp
     {
         private UpnpDevice _device;
 
+        public UpnpService()
+        {
+            //this.Actions = new CustomActionCollection<UpnpAction>((action) => action.ServiceDescription = this, (action) => action.ServiceDescription = null);
+            this.Actions = new List<UpnpAction>();
+            this.Variables = new List<UpnpStateVariable>();
+        }
+
         #region Object Overrides
 
         public override string ToString()
@@ -148,6 +155,18 @@ namespace Upnp.Upnp
         public Uri EventUrl
         {
             get { return new Uri(this.Root.UrlBase, this.RelativeEventUrl); }
+        }
+
+        public IList<UpnpAction> Actions
+        {
+            get;
+            private set;
+        }
+
+        public IList<UpnpStateVariable> Variables
+        {
+            get;
+            private set;
         }
 
         #endregion

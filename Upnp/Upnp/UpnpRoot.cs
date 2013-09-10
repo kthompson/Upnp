@@ -94,14 +94,12 @@ namespace Upnp.Upnp
         }
 
         private Uri _deviceDescriptionUrl;
-
         public Uri DeviceDescriptionUrl
         {
             get { return _deviceDescriptionUrl; }
             set
             {
                 _deviceDescriptionUrl = value;
-
                 if (_deviceDescriptionUrl == null)
                 {
                     this.UrlBase = null;
@@ -144,7 +142,6 @@ namespace Upnp.Upnp
         #endregion
 
         public event EventHandler<EventArgs<UpnpDevice>> ChildDeviceAdded;
-
         public event EventHandler<EventArgs<UpnpDevice>> ChildDeviceRemoved;
 
         protected internal void OnChildDeviceAdded(UpnpDevice child)
@@ -160,8 +157,7 @@ namespace Upnp.Upnp
             if (handler != null) 
                 handler(this, new EventArgs<UpnpDevice>(child));
         }
-
-
+        
         public IEnumerable<UpnpDevice> FindByDeviceType(UpnpType type)
         {
             var root = this.RootDevice;

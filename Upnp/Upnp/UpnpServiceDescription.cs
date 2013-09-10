@@ -10,12 +10,11 @@ namespace Upnp.Upnp
 {
     public class UpnpServiceDescription : IXmlSerializable
     {
+        public UpnpService Service { get; private set; }
 
-        public UpnpServiceDescription()
+        public UpnpServiceDescription(UpnpService service)
         {
-            //this.Actions = new CustomActionCollection<UpnpAction>((action) => action.ServiceDescription = this, (action) => action.ServiceDescription = null);
-            this.Actions = new List<UpnpAction>();
-            this.Variables = new List<UpnpStateVariable>();
+            this.Service = service;
         }
 
         #region IXmlSerializable Implementation
@@ -30,7 +29,7 @@ namespace Upnp.Upnp
             if (reader.LocalName != "scpd" && !reader.ReadToDescendant("scpd"))
                 throw new InvalidDataException();
 
-            var dict = new Dictionary<string, Action>()
+            var dict = new Dictionary<string, Action>
             {
                 {"specVersion", () => XmlHelper.ParseXml(reader, new Dictionary<string, Action>
                     {
@@ -38,8 +37,8 @@ namespace Upnp.Upnp
                         {"minor", () => this.VersionMinor = reader.ReadElementContentAsInt()}
                     })
                 },
-                {"actionList", () => XmlHelper.ParseXmlCollection(reader, this.Actions, "action", () => new UpnpAction())},
-                {"serviceStateTable", () => XmlHelper.ParseXmlCollection(reader, this.Variables, "stateVariable", () => new UpnpStateVariable())}
+                {"actionList", () => XmlHelper.ParseXmlCollection(reader, this.Service.Actions, "action", () => new UpnpAction())},
+                {"serviceStateTable", () => XmlHelper.ParseXmlCollection(reader, this.Service.Variables, "stateVariable", () => new UpnpStateVariable())}
             };
 
             XmlHelper.ParseXml(reader, dict);
@@ -53,10 +52,9 @@ namespace Upnp.Upnp
             writer.WriteElementString("major", this.VersionMajor.ToString());
             writer.WriteElementString("minor", this.VersionMinor.ToString());
             writer.WriteEndElement();
-            writer.WriteCollection(this.Actions, "actionList", true);
-            writer.WriteCollection(this.Variables, "serviceStateTable", true);
+            writer.WriteCollection(this.Service.Actions, "actionList", true);
+            writer.WriteCollection(this.Service.Variables, "serviceStateTable", true);
             writer.WriteEndElement();
-
         }
 
         #endregion
@@ -73,18 +71,6 @@ namespace Upnp.Upnp
         {
             get;
             set;
-        }
-
-        public IList<UpnpAction> Actions
-        {
-            get;
-            private set;
-        }
-
-        public IList<UpnpStateVariable> Variables
-        {
-            get;
-            private set;
         }
 
         #endregion

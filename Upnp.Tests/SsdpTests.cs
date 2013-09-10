@@ -55,7 +55,7 @@ namespace Upnp.Tests
                 {
                     search.SearchAsync();
 
-                    if (!Monitor.Wait(mutex, TimeSpan.FromSeconds(120)))
+                    if (!Monitor.Wait(mutex, TimeSpan.FromSeconds(30)))
                     {
                         Assert.Fail("The announcement timed out.");
                     }
