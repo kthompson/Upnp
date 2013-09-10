@@ -13,10 +13,10 @@ namespace Upnp.Upnp
     {
         public UpnpRoot Root { get; private set; }
 
-        protected readonly SsdpServer SsdpServer;
+        protected readonly ISsdpServer SsdpServer;
         protected readonly GenaServer GenaServer;
         
-        public UpnpServer(UpnpRoot root, SsdpServer ssdp = null, GenaServer gena = null)
+        public UpnpServer(UpnpRoot root, ISsdpServer ssdp = null, GenaServer gena = null)
         {
             this.Root = root;
             this.Root.ChildDeviceAdded += OnChildDeviceAdded;
