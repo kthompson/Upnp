@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Net;
@@ -174,6 +175,7 @@ namespace Upnp.Ssdp
                 // NOTE: It's recommended to send two searches
                 this.Sockets.ForEachSocket(socket =>
                 {
+                    Trace.WriteLine(string.Format("Sending ssdp:discover [{0}, {1}] from {2} to {3}", this.SearchType, this.Mx, socket.LocalEndpoint, dest1), AppInfo.Application);
                     socket.Send(bytes, bytes.Length, dest1);
                     socket.Send(bytes, bytes.Length, dest1);
                 });
