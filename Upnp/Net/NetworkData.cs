@@ -11,9 +11,10 @@ namespace Upnp.Net
         /// Initializes a new instance of the <see cref="NetworkData"/> class.
         /// </summary>
         /// <param name="buffer">The buffer.</param>
+        /// <param name="localEp">the local endpoint</param>
         /// <param name="remoteEp">The remote ep.</param>
-        public NetworkData(byte[] buffer, EndPoint remoteEp)
-            : this(buffer, buffer.Length, remoteEp)
+        public NetworkData(byte[] buffer, IPEndPoint localEp, IPEndPoint remoteEp)
+            : this(buffer, buffer.Length, localEp, remoteEp)
         {
         }
 
@@ -22,11 +23,13 @@ namespace Upnp.Net
         /// </summary>
         /// <param name="buffer">The buffer.</param>
         /// <param name="length">The length.</param>
+        /// <param name="localEp"></param>
         /// <param name="remoteEp">The remote ep.</param>
-        public NetworkData(byte[] buffer, int length, EndPoint remoteEp)
+        public NetworkData(byte[] buffer, int length, IPEndPoint localEp, IPEndPoint remoteEp)
         {
             this.Buffer = buffer;
             this.Length = length;
+            this.LocalEndpoint = localEp;
             this.RemoteEndpoint = remoteEp;
         }
 
@@ -60,7 +63,7 @@ namespace Upnp.Net
         /// <value>
         /// The remote endpoint.
         /// </value>
-        public EndPoint RemoteEndpoint
+        public IPEndPoint LocalEndpoint
         {
             get;
             protected set;
@@ -69,9 +72,10 @@ namespace Upnp.Net
         /// <summary>
         /// Gets the remote IP endpoint.
         /// </summary>
-        public IPEndPoint RemoteIPEndpoint
+        public IPEndPoint RemoteEndpoint
         {
-            get { return (this.RemoteEndpoint as IPEndPoint); }
+            get;
+            protected set;
         }
     }
 }

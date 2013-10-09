@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
 using System.Net;
@@ -21,6 +22,7 @@ namespace Upnp.Net
         {
             this.Client = CreateSocket(localEp);
             this.Client.Bind(localEp);
+            this.Buffer = new byte[0x10000];
         }
 
         #endregion
@@ -92,43 +94,74 @@ namespace Upnp.Net
         /// </summary>
         protected void BeginReceive()
         {
-            this.BeginReceive(ar =>
+            if (this.LocalEndpoint == null)
+                return;
+
+            EndPoint remoteEp = new IPEndPoint((this.LocalEndpoint.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any), 0);
+            var flags = SocketFlags.None;
+            this.Client.BeginReceiveMessageFrom(this.Buffer, 0, this.Buffer.Length, flags, ref remoteEp, ar =>
             {
-                IPEndPoint remoteEp = new IPEndPoint(IPAddress.Any, 0);
+                IPEndPoint localEp;
                 byte[] buffer;
 
-                try
+                using (this.GetReadLock())
                 {
-                    using (this.GetReadLock())
+                    // If the server is stopped then return now
+                    if (!this.IsListening)
+                        return;
+                    try
                     {
-                        // If the server is stopped then return now
-                        if (!this.IsListening)
-                            return;
-
                         // Complete our receive by getting the data
-                        buffer = this.EndReceive(ar, ref remoteEp);
+                        IPPacketInformation packetInfo;
+                        int size = this.Client.EndReceiveMessageFrom(ar, ref flags, ref remoteEp, out packetInfo);
+                        localEp = new IPEndPoint(packetInfo.Address, this.LocalEndpoint.Port);
 
-                        // Continue receiving data
-                        this.BeginReceive();
+                        var unicast = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces().Select(iface =>
+                            {
+                                var props = iface.GetIPProperties();
+                                if (props == null)
+                                    return null;
+
+                                var ipv4 = props.GetIPv4Properties();
+                                if (ipv4 != null && ipv4.Index == packetInfo.Interface)
+                                    return props.UnicastAddresses.FirstOrDefault((addr) => addr.Address.AddressFamily == AddressFamily.InterNetwork);
+
+                                var ipv6 = props.GetIPv6Properties();
+                                if (ipv6 != null && ipv6.Index == packetInfo.Interface)
+                                    return props.UnicastAddresses.FirstOrDefault((addr) => addr.Address.AddressFamily == AddressFamily.InterNetworkV6);
+
+                                return null;
+                            }).FirstOrDefault((result) => result != null);
+
+                        if (unicast != null)
+                            localEp.Address = unicast.Address;
+
+                        // Copy the data out of the shared buffer into a buffer just for this data
+                        buffer = new byte[size];
+                        Array.Copy(this.Buffer, buffer, size);
                     }
-                }
-                catch (SocketException)
-                {
-                    // An error occurred while receiving the data so stop receiving
-                    return;
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Socket was closed/disposed so stop listening
-                    return;
+
+                    catch (SocketException)
+                    {
+                        // An error occurred while receiving the data so stop receiving
+                        return;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Socket was closed/disposed so stop listening
+                        return;
+                    }
+
+                    // Continue receiving data
+                    this.BeginReceive();
                 }
 
                 // Send our event forward
-                this.OnDataReceived(new NetworkData(buffer, remoteEp));
+                this.OnDataReceived(new NetworkData(buffer, localEp, remoteEp as IPEndPoint));
 
             }, null);
         }
-        
+
         #endregion
 
         #region Locking
@@ -156,6 +189,12 @@ namespace Upnp.Net
         #endregion
 
         #region Properties
+
+        protected byte[] Buffer
+        {
+            get;
+            set;
+        }
 
         /// <summary>
         /// Gets a value indicating whether this instance is listening.

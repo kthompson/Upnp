@@ -14,7 +14,7 @@ namespace Upnp.Ssdp
     /// <summary>
     /// Class representing an SSDP Search
     /// </summary>
-    class SsdpSearch : ISsdpSearch
+    internal class SsdpSearch : ISsdpSearch, IDisposable
     {
 
         #region Constructors
@@ -22,16 +22,21 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Initializes a new instance of the <see cref="SsdpSearch"/> class.
         /// </summary>
-        public SsdpSearch(params ISsdpSocket[] sockets)
+        public SsdpSearch(ISsdpSocket socket = null)
         {
-            if (sockets.Length == 0)
-                sockets = SsdpSocketFactory.BuildSockets().ToArray();
+            if (socket == null)
+            {
+                socket = new SsdpSocket();
+                this.OwnsServer = true;
+            }
 
-            this.Sockets = new SsdpSocketCollection(sockets);
+            this.Server = socket;
             this.HostEndpoint = new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, Protocol.DefaultPort);
             this.SearchType = Protocol.SsdpAll;
             this.Mx = Protocol.DefaultMx;
         }
+
+        protected bool OwnsServer { get; set; }
 
         #endregion
 
@@ -47,22 +52,22 @@ namespace Upnp.Ssdp
             object syncRoot = new object();
             SsdpMessage result = null;
             EventHandler<EventArgs<SsdpMessage>> resultHandler = null;
-            
+
             // Create our handler to make all the magic happen
             resultHandler = (sender, e) =>
-            {
-                lock (syncRoot)
                 {
-                    // If we already got our first result then ignore this
-                    if (result != null)
-                        return;
+                    lock (syncRoot)
+                    {
+                        // If we already got our first result then ignore this
+                        if (result != null)
+                            return;
 
-                    // This is our first result so set our value, remove the handler, and cancel the search
-                    result = e.Value;
-                    this.ResultFound -= resultHandler;
-                    this.CancelSearch();
-                }
-            };
+                        // This is our first result so set our value, remove the handler, and cancel the search
+                        result = e.Value;
+                        this.ResultFound -= resultHandler;
+                        this.CancelSearch();
+                    }
+                };
 
             try
             {
@@ -94,19 +99,19 @@ namespace Upnp.Ssdp
         {
             var results = new List<SsdpMessage>();
             EventHandler<EventArgs<SsdpMessage>> resultHandler = (sender, e) =>
-            {
-                lock (results)
                 {
-                    results.Add(e.Value);
-                }
-            };
+                    lock (results)
+                    {
+                        results.Add(e.Value);
+                    }
+                };
             EventHandler completeHandler = (sender, e) =>
-            {
-                lock (results)
                 {
-                    Monitor.PulseAll(results);
-                }
-            };
+                    lock (results)
+                    {
+                        Monitor.PulseAll(results);
+                    }
+                };
 
             try
             {
@@ -148,11 +153,11 @@ namespace Upnp.Ssdp
                     throw new InvalidOperationException("Search is already in progress.");
 
                 this.IsSearching = true;
-                this.Sockets.ForEachSocket(socket => socket.SsdpMessageReceived += OnSsdpMessageReceived);
+                this.Server.SsdpMessageReceived += OnSsdpMessageReceived;
 
                 // TODO: Come up with a good calculation for this
                 // Just double our mx value for the timeout for now
-                this.CreateSearchTimeout(TimeSpan.FromSeconds(this.Mx * 2));
+                this.CreateSearchTimeout(TimeSpan.FromSeconds(this.Mx*2));
             }
 
             // If no destinations were specified then default to the IPv4 discovery
@@ -160,25 +165,32 @@ namespace Upnp.Ssdp
                 destinations = new[] {new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, Protocol.DefaultPort)};
 
             // Start the server and join our igmp groups
-            this.Sockets.StartListening(destinations.Select(ep => ep.Address).ToArray());
+            this.Server.StartListening();
+
+            // Do we really need to join the multicast group to send out multicast messages? Seems that way...
+            foreach (IPEndPoint dest in destinations.Where(ep => IPAddressHelpers.IsMulticast(ep.Address)))
+                this.Server.JoinMulticastGroupAllInterfaces(dest.Address);
+
+            // If we're sending out any searches to the broadcast address then be sure to enable broadcasts
+            if (!this.Server.EnableBroadcast)
+                this.Server.EnableBroadcast = destinations.Any(ep => ep.Address.Equals(IPAddress.Broadcast));
+
 
             // Now send out our search data
             foreach (var dest in destinations)
             {
                 // Make sure we respect our option as to whether we use the destination as the host value
                 var host = (this.UseRemoteEndpointAsHost ? dest : this.HostEndpoint);
-                var req = Protocol.CreateDiscoveryRequest(host, this.SearchType, this.Mx);
+                var req = Protocol.CreateSearchRequest(host, this.SearchType, this.Mx);
                 var bytes = Encoding.ASCII.GetBytes(req);
                 var dest1 = dest;
-                
+
                 // TODO: Should we make this configurable?
                 // NOTE: It's recommended to send two searches
-                this.Sockets.ForEachSocket(socket =>
-                {
-                    Trace.WriteLine(string.Format("Sending ssdp:discover [{0}, {1}] from {2} to {3}", this.SearchType, this.Mx, socket.LocalEndpoint, dest1), AppInfo.Application);
-                    socket.Send(bytes, bytes.Length, dest1);
-                    socket.Send(bytes, bytes.Length, dest1);
-                });
+
+                Trace.WriteLine(string.Format("Sending ssdp:discover [{0}, {1}] from {2} to {3}", this.SearchType, this.Mx, this.Server.LocalEndpoint, dest1), AppInfo.Application);
+                this.Server.Send(bytes, bytes.Length, dest1);
+                this.Server.Send(bytes, bytes.Length, dest1);
             }
         }
 
@@ -201,7 +213,7 @@ namespace Upnp.Ssdp
                 }
 
                 // Cleanup our handler and notify everyone that we're done
-                this.Sockets.ForEachSocket(socket => socket.SsdpMessageReceived -= OnSsdpMessageReceived);
+                this.Server.SsdpMessageReceived -= OnSsdpMessageReceived;
 
                 this.IsSearching = false;
                 this.OnSearchComplete();
@@ -215,13 +227,13 @@ namespace Upnp.Ssdp
         {
             // Create an object for signaling and an event handler to signal it
             object signal = new object();
-            EventHandler handler = (sender, args)  =>
-            {
-                lock (signal)
+            EventHandler handler = (sender, args) =>
                 {
-                    Monitor.Pulse(signal);
-                }
-            };
+                    lock (signal)
+                    {
+                        Monitor.Pulse(signal);
+                    }
+                };
 
             try
             {
@@ -257,22 +269,22 @@ namespace Upnp.Ssdp
             lock (this.SearchLock)
             {
                 this.CurrentSearchTimeout = Dispatcher.Add(() =>
-                {
-                    lock (this.SearchLock)
                     {
-                        // Search may have already been cancelled
-                        if (!this.IsSearching)
-                            return;
+                        lock (this.SearchLock)
+                        {
+                            // Search may have already been cancelled
+                            if (!this.IsSearching)
+                                return;
 
-                        // Make sure we remove ourself before calling CancelSearch
-                        this.CurrentSearchTimeout = null;
+                            // Make sure we remove ourself before calling CancelSearch
+                            this.CurrentSearchTimeout = null;
 
-                        // Cancel search will clean up everything
-                        // Seems kind of wrong but it does exactly what we want
-                        // If we add a special cancel event or something then we'll want to change this
-                        this.CancelSearch();
-                    }
-                }, timeout);
+                            // Cancel search will clean up everything
+                            // Seems kind of wrong but it does exactly what we want
+                            // If we add a special cancel event or something then we'll want to change this
+                            this.CancelSearch();
+                        }
+                    }, timeout);
             }
         }
 
@@ -289,16 +301,16 @@ namespace Upnp.Ssdp
         {
             // Queue this response to be processed
             ThreadPool.QueueUserWorkItem(data =>
-            {
-                try
                 {
-                    this.OnResultFound(e.Value);
-                }
-                catch (ArgumentException ex)
-                {
-                    System.Diagnostics.Trace.TraceError("Failed to parse SSDP response: {0}", ex.ToString());
-                }
-            });
+                    try
+                    {
+                        this.OnResultFound(e.Value);
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        Trace.TraceError("Failed to parse SSDP response: {0}", ex.ToString());
+                    }
+                });
         }
 
         /// <summary>
@@ -358,11 +370,7 @@ namespace Upnp.Ssdp
         /// <value>
         /// The current search timeout.
         /// </value>
-        protected IDisposable CurrentSearchTimeout
-        {
-            get;
-            set;
-        }
+        protected IDisposable CurrentSearchTimeout { get; set; }
 
         /// <summary>
         /// Gets or sets the server.
@@ -370,11 +378,7 @@ namespace Upnp.Ssdp
         /// <value>
         /// The server.
         /// </value>
-        protected SsdpSocketCollection Sockets
-        {
-            get;
-            set;
-        }
+        protected ISsdpSocket Server { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether this instance is searching.
@@ -382,11 +386,7 @@ namespace Upnp.Ssdp
         /// <value>
         /// 	<c>true</c> if this instance is searching; otherwise, <c>false</c>.
         /// </value>
-        public bool IsSearching
-        {
-            get;
-            protected set;
-        }
+        public bool IsSearching { get; protected set; }
 
         /// <summary>
         /// Gets or sets the filter.
@@ -394,11 +394,7 @@ namespace Upnp.Ssdp
         /// <value>
         /// The filter.
         /// </value>
-        public Func<SsdpMessage, bool> Filter
-        {
-            get;
-            set;
-        }
+        public Func<SsdpMessage, bool> Filter { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether [use remote endpoint as host].
@@ -406,11 +402,7 @@ namespace Upnp.Ssdp
         /// <value>
         /// 	<c>true</c> if [use remote endpoint as host]; otherwise, <c>false</c>.
         /// </value>
-        public bool UseRemoteEndpointAsHost
-        {
-            get;
-            set;
-        }
+        public bool UseRemoteEndpointAsHost { get; set; }
 
         /// <summary>
         /// Gets or sets the host endpoint.
@@ -418,11 +410,7 @@ namespace Upnp.Ssdp
         /// <value>
         /// The host endpoint.
         /// </value>
-        public IPEndPoint HostEndpoint
-        {
-            get;
-            set;
-        }
+        public IPEndPoint HostEndpoint { get; set; }
 
         /// <summary>
         /// Gets or sets the type of the search.
@@ -430,11 +418,7 @@ namespace Upnp.Ssdp
         /// <value>
         /// The type of the search.
         /// </value>
-        public string SearchType
-        {
-            get;
-            set;
-        }
+        public string SearchType { get; set; }
 
         /// <summary>
         /// Gets or sets the mx.
@@ -442,12 +426,15 @@ namespace Upnp.Ssdp
         /// <value>
         /// The mx.
         /// </value>
-        public ushort Mx
-        {
-            get;
-            set;
-        }
+        public ushort Mx { get; set; }
 
         #endregion
+
+        public virtual void Dispose()
+        {
+            // Only close the server if we created it
+            if (this.OwnsServer)
+                this.Server.Close();
+        }
     }
 }

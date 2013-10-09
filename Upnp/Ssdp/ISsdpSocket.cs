@@ -34,13 +34,11 @@ namespace Upnp.Ssdp
         /// Gets the local endpoint.
         /// </summary>
         IPEndPoint LocalEndpoint { get; }
-
-        Uri Location { get; }
-
-
+        
         void StartListening();
         void StopListening();
-
+        
+        void JoinMulticastGroupAllInterfaces(IPAddress ep);
         void JoinMulticastGroup(IPAddress remoteEp);
         void DropMulticastGroup(IPAddress address);
 
@@ -49,5 +47,6 @@ namespace Upnp.Ssdp
         int Send(byte[] dgram, int bytes);
 
         void Close();
+        
     }
 }

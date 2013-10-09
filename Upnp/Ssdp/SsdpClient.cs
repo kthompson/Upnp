@@ -16,8 +16,8 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Initializes a new instance of the <see cref="SsdpClient"/> class.
         /// </summary>
-        public SsdpClient(params ISsdpSocket[] sockets)
-            : base(sockets)
+        public SsdpClient(ISsdpSocket socket = null)
+            : base(socket)
         {
         }
 
@@ -31,7 +31,7 @@ namespace Upnp.Ssdp
         /// <returns></returns>
         public virtual ISsdpSearch CreateSearch(bool requireUniqueLocation)
         {
-            var search = new SsdpSearch(this.Sockets.ToArray());
+            var search = new SsdpSearch();
 
             var dict = new Dictionary<string, SsdpMessage>();
             search.Filter = msg =>

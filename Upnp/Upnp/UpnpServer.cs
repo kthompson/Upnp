@@ -21,9 +21,7 @@ namespace Upnp.Upnp
             this.Root = root;
             this.Root.ChildDeviceAdded += OnChildDeviceAdded;
 
-            var sockets = SsdpSocketFactory.BuildSockets().ToArray();
-
-            this.SsdpServer = ssdp ?? new SsdpServer(sockets);
+            this.SsdpServer = ssdp ?? new SsdpServer();
             this.GenaServer = gena ?? new GenaServer();
 
             BuildAdvertisements();

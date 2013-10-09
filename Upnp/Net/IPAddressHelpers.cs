@@ -12,7 +12,6 @@ namespace Upnp.Net
     /// </summary>
     public static class IPAddressHelpers
     {
-
         /// <summary>
         /// Determines whether the specified address is multicast.
         /// </summary>
@@ -37,6 +36,15 @@ namespace Upnp.Net
             }
             
             return false;
+        }
+
+        /// <summary>
+        /// Gets all unicast addresses.
+        /// </summary>
+        /// <returns></returns>
+        public static IEnumerable<IPAddress> GetUnicastAddresses()
+        {
+            return GetUnicastAddresses(addr => true);
         }
 
         /// <summary>

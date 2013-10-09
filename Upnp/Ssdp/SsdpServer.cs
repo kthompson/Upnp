@@ -18,8 +18,8 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Initializes a new instance of the <see cref="SsdpServer"/> class.
         /// </summary>
-        public SsdpServer(params ISsdpSocket[] sockets)
-            : base(sockets)
+        public SsdpServer(ISsdpSocket socket = null)
+            : base(socket)
         {
             this.Announcers = new Dictionary<ISsdpAnnouncer, bool>();
         }
@@ -37,7 +37,7 @@ namespace Upnp.Ssdp
         {
             lock (this.Announcers)
             {
-                var announcer = new SsdpAnnouncer(this.Sockets.ToArray());
+                var announcer = new SsdpAnnouncer(this.Server);
                 this.Announcers.Add(announcer, respondToSearches);
                 return announcer;
             }
@@ -89,17 +89,8 @@ namespace Upnp.Ssdp
         {
             lock (this.Announcers)
             {
-                foreach (var pair in this.Announcers.Where(pair => pair.Value))
-                {
-                    if (msg.SearchType == Protocol.SsdpAll)
-                        yield return pair.Key;
-
-                    if (msg.SearchType.StartsWith("uuid:") && msg.SearchType == pair.Key.USN)
-                        yield return pair.Key;
-
-                    if (msg.SearchType == pair.Key.NotificationType)
-                        yield return pair.Key;
-                }
+                foreach (var pair in this.Announcers.Where(pair => pair.Value && pair.Key.IsMatch(msg)))
+                    yield return pair.Key;
             }
         }
 
@@ -136,18 +127,24 @@ namespace Upnp.Ssdp
         /// </summary>
         protected void SendSearchResponse(SsdpMessage msg, ISsdpAnnouncer announcer)
         {
-            this.Sockets.ForEachSocket(socket =>
+            // If we were stopped then don't bother sending this message
+            if (!this.Server.IsListening)
+                return;
+
+            // Determine matching locations to respond with
+            // If none are found then just respond with all of our locations
+            var locations = announcer.GetLocations(addr => addr.Equals(msg.Destination.Address)).ToArray();
+            if (!locations.Any())
+                locations = announcer.GetLocations(addr => addr.AddressFamily == msg.Source.AddressFamily).ToArray();
+
+            foreach (var location in locations)
             {
-                // If we were stopped then don't bother sending this message
-                if (!socket.IsListening)
-                    return;
+                var response = Protocol.CreateSearchResponse(location, msg.SearchType, announcer.USN, announcer.MaxAge, Protocol.DefaultUserAgent);
+                byte[] bytes = Encoding.ASCII.GetBytes(response);
+                Trace.WriteLine(string.Format("Sending SearchResponse [{0}, {1}] from {2} to {3}", msg.SearchType, msg.USN, this.Server.LocalEndpoint, msg.Source), AppInfo.Application);
 
-                var aliveResponse = Protocol.CreateAliveResponse(socket.Location.ToString(), msg.SearchType, announcer.USN, announcer.MaxAge, Protocol.DefaultUserAgent);
-                var bytes = Encoding.ASCII.GetBytes(aliveResponse); 
-
-                Trace.WriteLine(string.Format("Sending SearchResponse [{0}, {1}] from {2} to {3}", msg.SearchType, msg.USN, socket.LocalEndpoint, msg.Source), AppInfo.Application);
-                socket.Send(bytes, bytes.Length, msg.Source);
-            });
+                this.Server.Send(bytes, bytes.Length, msg.Source);
+            }
         }
 
         #endregion
@@ -163,7 +160,7 @@ namespace Upnp.Ssdp
                 return;
 
             // Set up our dispatcher to send the response to each matching announcer that supports responding
-            foreach (var announcer in this.GetMatchingResponders(msg))
+            foreach (var announcer in this.GetMatchingResponders(msg).ToArray())
             {
                 var temp = announcer;
                 Dispatcher.Add(() => this.SendSearchResponse(msg, temp), TimeSpan.FromSeconds(new Random().Next(0, msg.MaxAge)));
@@ -180,17 +177,6 @@ namespace Upnp.Ssdp
         {
             get;
             private set;
-        }
-
-        public bool IsListening
-        {
-            get
-            {
-                if (this.Sockets.Count == 0)
-                    return false;
-
-                return this.Sockets.First().IsListening;
-            }
         }
 
         #endregion

@@ -12,11 +12,6 @@ namespace Upnp.Ssdp
     {
         public static IEnumerable<ISsdpSocket> BuildSockets(params int[] ports)
         {
-            return BuildSockets("device.xml", ports);
-        }
-        
-        public static IEnumerable<ISsdpSocket> BuildSockets(string locationPath = "device.xml", params int[] ports)
-        {
             if (ports.Length == 0)
                 ports = new[] {Protocol.DefaultPort};
 
@@ -26,14 +21,8 @@ namespace Upnp.Ssdp
                    let ip = ua.Address
                    //TODO: remove the ipv4 check
                    where !IPAddress.IsLoopback(ip) && ip.AddressFamily == AddressFamily.InterNetwork
-                   let uri = new UriBuilder { Scheme = "http", Host = ip.ToString(), Path = locationPath }.Uri
                    let ep = new IPEndPoint(ip, port)
-                   select (ISsdpSocket) new SsdpSocket(ep, uri);
-        }
-
-        public static ISsdpSocket BuildLocal(string location = "http://localhost/device.xml")
-        {
-            return new SsdpSocket(new IPEndPoint(IPAddress.Any, Protocol.DefaultPort), new Uri(location));
+                   select (ISsdpSocket) new SsdpSocket(ep);
         }
     }
 }

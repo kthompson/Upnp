@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
@@ -15,7 +16,7 @@ namespace Upnp.Ssdp
         /// <value>
         /// The server.
         /// </value>
-        protected SsdpSocketCollection Sockets
+        protected ISsdpSocket Server
         {
             get;
             set;
@@ -30,25 +31,12 @@ namespace Upnp.Ssdp
         public Func<SsdpMessage, bool> Filter { get; set; }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="SsdpServer"/> class.
-        /// </summary>
-        public SsdpListener(params IPEndPoint[] endPoints)
-            : this(endPoints.Select(ep => (ISsdpSocket)new SsdpSocket(ep)).ToArray())
-        {
-        }
-
-        /// <summary>
         /// Initializes a new instance of the <see cref="SsdpListener" /> class.
         /// </summary>
-        /// <param name="sockets">The ssdp sockets.</param>
-        public SsdpListener(ISsdpSocket[] sockets)
+        public SsdpListener(ISsdpSocket socket = null)
         {
-            if (sockets.Length == 0)
-                sockets = SsdpSocketFactory.BuildSockets().ToArray();
-
-            this.Sockets = new SsdpSocketCollection(sockets);
-
-            this.Sockets.ForEachSocket(socket => socket.SsdpMessageReceived += this.OnSsdpMessageReceived);
+            this.Server = socket ?? new SsdpSocket(new IPEndPoint(IPAddress.Any, 1900));
+            this.Server.SsdpMessageReceived += this.OnSsdpMessageReceived;
         }
 
         /// <summary>
@@ -59,58 +47,76 @@ namespace Upnp.Ssdp
         /// </value>
         public bool IsListening
         {
-            get { return this.Sockets.IsListening; }
+            get { return this.Server.IsListening; }
         }
-
 
         /// <summary>
         /// Starts listening on the specified remote endpoints.
         /// </summary>
-        /// <param name="groups">The remote eps.</param>
-        public virtual void StartListening(params IPAddress[] groups)
+        /// <param name="remoteEps">The remote eps.</param>
+        public virtual void StartListening(params IPAddress[] remoteEps)
         {
-            this.Sockets.StartListening(groups);
+            if (remoteEps == null || remoteEps.Length == 0)
+                remoteEps = new[] { Protocol.DiscoveryEndpoints.IPv4 };
+
+            lock (this.Server)
+            {
+                if (!this.Server.IsListening)
+                    this.Server.StartListening();
+
+                this.Server.EnableBroadcast = true;
+
+                // Join all the multicast groups specified
+                foreach (var ep in remoteEps.Where(IPAddressHelpers.IsMulticast))
+                    this.Server.JoinMulticastGroupAllInterfaces(ep);
+        }
         }
 
-        ///// <summary>
-        ///// Stops listening on the specified remote endpoints.
-        ///// </summary>
-        ///// <param name="remoteEps">The remote eps.</param>
-        //public void StopListeningOn(params IPEndPoint[] remoteEps)
-        //{
-        //    // If nothing specified then just stop listening on all
-        //    if (remoteEps == null || remoteEps.Length == 0)
-        //    {
-        //        this.StopListening();
-        //        return;
-        //    }
+        /// <summary>
+        /// Stops listening on the specified remote endpoints.
+        /// </summary>
+        /// <param name="remoteEps">The remote eps.</param>
+        public void StopListeningOn(params IPEndPoint[] remoteEps)
+        {
+            // If nothing specified then just stop listening on all
+            if (remoteEps == null || remoteEps.Length == 0)
+            {
+                this.StopListening();
+                return;
+            }
 
-        //    ForEachSocket(socket =>
-        //    {
-        //        if (!socket.IsListening)
-        //            return;
+            lock (this.Server)
+            {
+                if (!this.Server.IsListening)
+                    return;
 
-        //        // Drop all the multicast groups specified
-        //        foreach (var ep in remoteEps.Where(ep => IPAddressHelpers.IsMulticast(ep.Address)))
-        //        {
-        //            try
-        //            {
-        //                socket.DropMulticastGroup(ep.Address);
-        //            }
-        //            catch (SocketException)
-        //            {
-        //                // If we're not part of this group then it will throw an error so just ignore it
-        //            }
-        //        }
-        //    });
-        //}
+                // Drop all the multicast groups specified
+                foreach (IPEndPoint ep in remoteEps.Where(ep => IPAddressHelpers.IsMulticast(ep.Address)))
+                {
+                    try
+                    {
+                        this.Server.DropMulticastGroup(ep.Address);
+                    }
+                    catch (SocketException)
+                    {
+                        // If we're not part of this group then it will throw an error so just ignore it
+                    }
+                }
+            }
+        }
 
         /// <summary>
         /// Stops listening on all end points.
         /// </summary>
         public virtual void StopListening()
         {
-            this.Sockets.StopListening();
+            lock (this.Server)
+            {
+                if (!this.Server.IsListening)
+                    return;
+
+                this.Server.StopListening();
+        }
         }
 
         #region Events
@@ -237,7 +243,7 @@ namespace Upnp.Ssdp
             if(!disposing)
                 return;
 
-            this.Sockets.Dispose();
+            this.Server.Dispose();
         }
 
         /// <summary>

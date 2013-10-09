@@ -17,11 +17,14 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Initializes a new instance of the <see cref="SsdpMessage" /> class.
         /// </summary>
+        /// <param name="isRequest"></param>
+        /// <param name="destination">The destination.</param>
         /// <param name="source">The source.</param>
-        public SsdpMessage(IPEndPoint source)
-            : base(true)
+        private SsdpMessage(bool isRequest, IPEndPoint destination, IPEndPoint source)
+            : base(isRequest)
         {
             this.Source = source;
+            this.Destination = destination;
         }
 
         #endregion
@@ -78,6 +81,19 @@ namespace Upnp.Ssdp
         /// The source.
         /// </value>
         public IPEndPoint Source
+        {
+            get;
+            protected set;
+        }
+
+         
+        /// <summary>
+        /// Gets or sets the destination.
+        /// </summary>
+        /// <value>
+        /// The destination.
+        /// </value>
+        public IPEndPoint Destination
         {
             get;
             protected set;
@@ -238,13 +254,14 @@ namespace Upnp.Ssdp
         /// Parses the specified stream.
         /// </summary>
         /// <param name="stream">The stream.</param>
-        /// <param name="endPoint">The end point.</param>
+        /// <param name="source">The source.</param>
+        /// <param name="destination">The destination.</param>
         /// <returns></returns>
-        public static SsdpMessage Parse(Stream stream, IPEndPoint endPoint)
+        public static SsdpMessage Parse(Stream stream, IPEndPoint source, IPEndPoint destination)
         {
             using (var reader = new StreamReader(stream))
             {
-                return Parse(reader, endPoint);
+                return Parse(reader, source, destination);
             }
         }
 
@@ -253,13 +270,14 @@ namespace Upnp.Ssdp
         /// </summary>
         /// <param name="buffer">The buffer.</param>
         /// <param name="length">The length.</param>
-        /// <param name="endPoint">The end point.</param>
+        /// <param name="source">The source.</param>
+        /// <param name="destination">The destination.</param>
         /// <returns></returns>
-        public static SsdpMessage Parse(byte[] buffer, int length, IPEndPoint endPoint)
+        public static SsdpMessage Parse(byte[] buffer, int length, IPEndPoint source, IPEndPoint destination)
         {
             using (var stream = new MemoryStream(buffer, 0, length))
             {
-                return Parse(stream, endPoint);
+                return Parse(stream, source, destination);
             }
         }
 
@@ -267,14 +285,14 @@ namespace Upnp.Ssdp
         /// Parses the specified reader.
         /// </summary>
         /// <param name="reader">The reader.</param>
-        /// <param name="endPoint">The end point.</param>
+        /// <param name="source">The source.</param>
+        /// <param name="destination">The destination.</param>
         /// <returns></returns>
-        public static SsdpMessage Parse(TextReader reader, IPEndPoint endPoint)
+        public static SsdpMessage Parse(TextReader reader, IPEndPoint source, IPEndPoint destination)
         {
-            var message = new SsdpMessage(endPoint);
+            var message = new SsdpMessage(true, source, destination);
             message.FromStream(reader);
             return message;
         }
-
     }
 }

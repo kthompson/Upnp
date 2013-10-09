@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Net;
 using Upnp.Collections;
+using Upnp.Net;
 using Upnp.Timers;
 
 namespace Upnp.Ssdp
@@ -22,14 +23,21 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Initializes a new instance of the <see cref="SsdpAnnouncer" /> class.
         /// </summary>
-        /// <param name="sockets">The sockets.</param>
-        public SsdpAnnouncer(params ISsdpSocket[] sockets)
+        /// <param name="server">The server.</param>
+        public SsdpAnnouncer(ISsdpSocket server = null)
         {
-            this.Sockets = sockets;
+            if (server == null)
+            {
+                server = new SsdpSocket();
+                this.OwnsServer = true;
+            }
+            
+            this.Server = server;
             this.UserAgent = Protocol.DefaultUserAgent;
             this.MaxAge = Protocol.DefaultMaxAge;
             this.NotificationType = string.Empty;
             this.USN = string.Empty;
+            this.Location = string.Empty;
             this.RemoteEndPoints = new SyncCollection<IPEndPoint>
                 {
                     new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, Protocol.DefaultPort), 
@@ -151,13 +159,72 @@ namespace Upnp.Ssdp
         {
             ForEachRemoteEndPoint((ep, socket) =>
             {
-                Trace.WriteLine(string.Format("DeviceAlive [{0}, {1}] from {2} to {3}", this.NotificationType, this.USN, socket.LocalEndpoint, ep), AppInfo.Application);
+                // Send an alive message for each interface we have
+                foreach (var location in this.GetLocations(addr => addr.AddressFamily == ep.AddressFamily))
+                {
+                    Trace.WriteLine(string.Format("DeviceAlive [{0}, {1}] from {2} to {3}", this.NotificationType, this.USN, socket.LocalEndpoint, ep), AppInfo.Application);
 
-                var notify = Protocol.CreateAliveNotify(ep, socket.Location.ToString(), this.NotificationType, this.USN, this.MaxAge, this.UserAgent);
-                var bytes = Encoding.ASCII.GetBytes(notify);
+                    var notify = Protocol.CreateAliveNotify(new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, 1900), location, this.NotificationType, this.USN, this.MaxAge, this.UserAgent);
+                    var bytes = Encoding.ASCII.GetBytes(notify);
 
-                socket.Send(bytes, bytes.Length, ep);
+                    socket.Send(bytes, bytes.Length, ep);    
+                }
             });
+        }
+
+
+        /// <summary>
+        /// Gets the locations to respond with.
+        /// </summary>
+        /// <param name="condition">Condition to use when determining locations.</param>
+        /// <returns></returns>
+        public virtual IEnumerable<string> GetLocations(Func<IPAddress, bool> condition)
+        {
+            Uri uri;
+            if (!Uri.TryCreate(this.Location, UriKind.Absolute, out uri) || (uri.Host != "0.0.0.0" && uri.Host != "localhost"))
+                yield return this.Location;
+            else
+            {
+                foreach (var addr in IPAddressHelpers.GetUnicastAddresses())
+                {
+                    // Don't include the loopback
+                    if (IPAddress.IsLoopback(addr))
+                        continue;
+
+                    // Skip any addresses not matching our condition
+                    if (!condition(addr))
+                        continue;
+
+                    var builder = new UriBuilder(uri);
+                    if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+                        builder.Host = string.Format("[{0}]", addr);
+                    else
+                        builder.Host = addr.ToString();
+
+                    yield return builder.ToString();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Determines whether the specified search message is a match.
+        /// </summary>
+        /// <param name="msg">The search message.</param>
+        /// <returns>
+        ///   <c>true</c> if the specified search message is a match; otherwise, <c>false</c>.
+        /// </returns>
+        public virtual bool IsMatch(SsdpMessage msg)
+        {
+            if (msg.SearchType == Protocol.SsdpAll)
+                return true;
+
+            if (msg.SearchType.StartsWith("uuid:") && msg.SearchType == this.USN)
+                return true;
+
+            if (msg.SearchType == this.NotificationType)
+                return true;
+
+            return false;
         }
 
         #endregion
@@ -172,14 +239,10 @@ namespace Upnp.Ssdp
         {
             Parallel.ForEach(this.RemoteEndPoints.ToArray(), ep =>
             {
-                foreach (var socket in Sockets)
-                {
-                    var localEp = socket.LocalEndpoint;
-                    if (localEp == null || localEp.AddressFamily != ep.AddressFamily)
-                        continue;
+                var localEp = this.Server.LocalEndpoint;
+                if (localEp != null && localEp.AddressFamily == ep.AddressFamily)
+                    action(ep, this.Server);
 
-                    action(ep, socket);
-                }
             });
         }
 
@@ -190,7 +253,8 @@ namespace Upnp.Ssdp
         {
             ForEachRemoteEndPoint((ep, socket) =>
             {
-                var bytes = Encoding.ASCII.GetBytes(Protocol.CreateByeByeNotify(ep, this.NotificationType, this.USN));
+                var byeByeNotify = Protocol.CreateByeByeNotify(new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, 1900), this.NotificationType, this.USN);
+                var bytes = Encoding.ASCII.GetBytes(byeByeNotify);
                 Trace.WriteLine(string.Format("DeviceByeBye [{0}, {1}] from {2} to {3}", this.NotificationType, this.USN, socket.LocalEndpoint, ep), AppInfo.Application);
                 socket.Send(bytes, bytes.Length, ep);
             });
@@ -210,7 +274,19 @@ namespace Upnp.Ssdp
         /// <value>
         /// The server.
         /// </value>
-        protected ISsdpSocket[] Sockets
+        protected ISsdpSocket Server
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Gets or sets whether the socket is owned by this instance.
+        /// </summary>
+        /// <value>
+        /// The server.
+        /// </value>
+        protected bool OwnsServer
         {
             get;
             set;
@@ -225,6 +301,18 @@ namespace Upnp.Ssdp
         public bool IsRunning
         {
             get { return this.TimeoutTokens != null && this.TimeoutTokens.Count > 0; }
+        }
+
+        /// <summary>
+        /// Gets or sets the location.
+        /// </summary>
+        /// <value>
+        /// The location.
+        /// </value>
+        public string Location
+        {
+            get;
+            set;
         }
 
         /// <summary>
@@ -294,6 +382,9 @@ namespace Upnp.Ssdp
         public void Dispose()
         {
             this.Shutdown();
+
+            if (this.OwnsServer)
+                this.Server.Close();
         }
 
         #endregion

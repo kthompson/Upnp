@@ -41,12 +41,23 @@ namespace Upnp.Ssdp
 
         private static string OSString = String.Format("{0}/{1}", Environment.OSVersion.Platform, Environment.OSVersion.Version);
 
-        private static string DiscoveryRequest =
+        private static string SearchRequest =
             "M-SEARCH * HTTP/1.1\r\n" +
             "HOST: {0}:{1}\r\n" +
             "MAN: \"ssdp:discover\"\r\n" +
             "ST: {2}\r\n" +
             "MX: {3}\r\n" +
+            "\r\n";
+
+        private static string SearchResponse =
+            "HTTP/1.1 200 OK\r\n" +
+            "CACHE-CONTROL: max-age={0}\r\n" +
+            "DATE: {1}\r\n" +
+            "EXT:\r\n" +
+            "LOCATION: {2}\r\n" +
+            "SERVER: {3} UPnP/1.1 {4}\r\n" +
+            "ST: {5}\r\n" +
+            "USN: {6}\r\n" +
             "\r\n";
 
         private static string AliveNotify =
@@ -68,7 +79,7 @@ namespace Upnp.Ssdp
             "EXT:\r\n" +
             "LOCATION: {2}\r\n" +
             "SERVER: {3} UPnP/1.1 {4}\r\n" +
-            "ST: {5}\r\n" +
+            "NT: {5}\r\n" +
             "USN: {6}\r\n" +
             "\r\n";
 
@@ -81,15 +92,29 @@ namespace Upnp.Ssdp
             "\r\n";
 
         /// <summary>
-        /// Creates the discovery request.
+        /// Creates the search request.
         /// </summary>
         /// <param name="dest">The destination.</param>
         /// <param name="serviceType">Type of the service.</param>
         /// <param name="mx">The mx.</param>
         /// <returns></returns>
-        public static string CreateDiscoveryRequest(IPEndPoint dest, string serviceType, ushort mx)
+        public static string CreateSearchRequest(IPEndPoint dest, string serviceType, ushort mx)
         {
-            return string.Format(DiscoveryRequest, dest.Address, dest.Port, serviceType, mx);
+            return string.Format(SearchRequest, dest.Address, dest.Port, serviceType, mx);
+        }
+
+        /// <summary>
+        /// Creates the search response.
+        /// </summary>
+        /// <param name="location">The location.</param>
+        /// <param name="searchType">Type of the search.</param>
+        /// <param name="usn">The usn.</param>
+        /// <param name="maxAge">The max age.</param>
+        /// <param name="userAgent">The user agent.</param>
+        /// <returns></returns>
+        public static string CreateSearchResponse(string location, string searchType, string usn, ushort maxAge, string userAgent)
+        {
+            return string.Format(SearchResponse, maxAge, DateTime.Now.ToString("r"), location, OSString, userAgent, searchType, usn);
         }
 
         /// <summary>

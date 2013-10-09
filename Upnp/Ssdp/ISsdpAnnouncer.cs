@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 using Upnp.Collections;
 
@@ -65,5 +66,19 @@ namespace Upnp.Ssdp
         /// The user agent.
         /// </value>
         string UserAgent { get; set; }
+
+        /// <summary>
+        /// Determines whether the specified MSG is match.
+        /// </summary>
+        /// <param name="msg">The MSG.</param>
+        /// <returns></returns>
+        bool IsMatch(SsdpMessage msg);
+
+        /// <summary>
+        /// Gets all locations that this announcer can advertise.
+        /// </summary>
+        /// <param name="condition">The condition.</param>
+        /// <returns></returns>
+        IEnumerable<string> GetLocations(Func<IPAddress, bool> condition);
     }
 }

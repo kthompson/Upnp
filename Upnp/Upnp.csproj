@@ -40,6 +40,7 @@
     <Compile Include="Collections\SyncCollection.cs" />
     <Compile Include="Disposable.cs" />
     <Compile Include="EventArgs.cs" />
+    <Compile Include="Extensions\UpnpExtensions.cs" />
     <Compile Include="Extensions\Dictionary.cs" />
     <Compile Include="Extensions\Enumerable.cs" />
     <Compile Include="Extensions\Xml.cs" />
