@@ -72,17 +72,6 @@ namespace Upnp.Ssdp
             "CONTENT-LENGTH: 0\r\n" +
             "\r\n";
 
-        private static string AliveResponse =
-            "HTTP/1.1 200 OK\r\n" +
-            "CACHE-CONTROL: max-age={0}\r\n" +
-            "DATE: {1}\r\n" +
-            "EXT:\r\n" +
-            "LOCATION: {2}\r\n" +
-            "SERVER: {3} UPnP/1.1 {4}\r\n" +
-            "NT: {5}\r\n" +
-            "USN: {6}\r\n" +
-            "\r\n";
-
         private static readonly string ByebyeNotify =
             "NOTIFY * HTTP/1.1\r\n" +
             "HOST: {0}:{1}\r\n" +
@@ -130,20 +119,6 @@ namespace Upnp.Ssdp
         public static string CreateAliveNotify(IPEndPoint dest, string location, string notificationType, string usn, ushort maxAge, string userAgent)
         {
             return string.Format(AliveNotify, dest.Address, dest.Port, maxAge, location, notificationType, OSString, userAgent, usn);
-        }
-
-        /// <summary>
-        /// Creates the alive response.
-        /// </summary>
-        /// <param name="location">The location.</param>
-        /// <param name="searchType">Type of the search.</param>
-        /// <param name="usn">The usn.</param>
-        /// <param name="maxAge">The max age.</param>
-        /// <param name="userAgent">The user agent.</param>
-        /// <returns></returns>
-        public static string CreateAliveResponse(string location, string searchType, string usn, ushort maxAge, string userAgent)
-        {
-            return string.Format(AliveResponse, maxAge, DateTime.Now.ToString("r"), location, OSString, userAgent, searchType, usn);
         }
 
         /// <summary>
