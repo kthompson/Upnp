@@ -162,31 +162,6 @@ namespace Upnp.Upnp
         }
 
 
-        public IEnumerable<UpnpDevice> FindByDeviceType(UpnpType type)
-        {
-            var root = this.RootDevice;
-            if (root == null)
-                yield break;
-
-            if (root.Type.Equals(type))
-                yield return root;
-
-            foreach (var device in root.FindByDeviceType(type))
-            {
-                yield return device;
-            }
-        }
-
-        public IEnumerable<UpnpDevice> EnumerateDevices()
-        {
-            return this.RootDevice.EnumerateDevices();            
-        }
-
-        public IEnumerable<UpnpService> EnumerateServices()
-        {
-            return this.EnumerateDevices().SelectMany(d => d.Services);
-        }
-
         public static UpnpRoot LoadFromDeviceDescriptionUrl(string url)
         {
             var root = new UpnpRoot();

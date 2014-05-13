@@ -269,20 +269,5 @@ namespace Upnp.Upnp
         }
   
         #endregion
-
-        public IEnumerable<UpnpDevice> FindByDeviceType(UpnpType type)
-        {
-            return this.EnumerateDevices().Where(d => d.Type.Equals(type));
-        }
-
-        public IEnumerable<UpnpDevice> EnumerateDevices()
-        {
-            return new[] { this }.Concat(this.Devices.SelectMany(d => d.EnumerateDevices()));
-        }
-
-        public IEnumerable<UpnpService> EnumerateServices()
-        {
-            return this.EnumerateDevices().SelectMany(device => device.Services);
-        }
     }
 }
