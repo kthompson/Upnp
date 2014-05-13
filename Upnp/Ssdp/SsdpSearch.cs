@@ -14,7 +14,7 @@ namespace Upnp.Ssdp
     /// <summary>
     /// Class representing an SSDP Search
     /// </summary>
-    internal class SsdpSearch : ISsdpSearch, IDisposable
+    internal class SsdpSearch : ISsdpSearch
     {
 
         #region Constructors

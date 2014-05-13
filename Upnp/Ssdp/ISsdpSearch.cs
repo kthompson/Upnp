@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Threading.Tasks;
 
 namespace Upnp.Ssdp
 {
-    public interface ISsdpSearch
+    public interface ISsdpSearch : IDisposable
     {
         /// <summary>
         /// Finds the first result.
