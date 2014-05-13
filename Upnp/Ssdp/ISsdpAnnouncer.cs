@@ -75,6 +75,18 @@ namespace Upnp.Ssdp
         bool IsMatch(SsdpMessage msg);
 
         /// <summary>
+        /// Gets or sets the location.
+        /// </summary>
+        /// <value>
+        /// The location.
+        /// </value>
+        string Location
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
         /// Gets all locations that this announcer can advertise.
         /// </summary>
         /// <param name="condition">The condition.</param>
