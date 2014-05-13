@@ -22,7 +22,7 @@ namespace Upnp.Net
         {
             this.Client = CreateSocket(localEp);
             this.Client.Bind(localEp);
-            this.Buffer = new byte[0x10000];
+            this.Buffer = new byte[0x100000];
         }
 
         #endregion
@@ -94,11 +94,11 @@ namespace Upnp.Net
         /// </summary>
         protected void BeginReceive()
         {
-            if (this.LocalEndpoint == null)
+            if (this.LocalEndpoint == null || this.Client == null)
                 return;
 
             EndPoint remoteEp = new IPEndPoint((this.LocalEndpoint.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any), 0);
-            var flags = SocketFlags.None;
+            var flags = SocketFlags.None;            
             this.Client.BeginReceiveMessageFrom(this.Buffer, 0, this.Buffer.Length, flags, ref remoteEp, ar =>
             {
                 IPEndPoint localEp;
@@ -273,6 +273,7 @@ namespace Upnp.Net
             if (disposing)
             {
                 this.StopListening();
+                this.Client = null;
             }
         }
 
