@@ -39,10 +39,10 @@ namespace Upnp.Ssdp
             this.NotificationType = string.Empty;
             this.USN = string.Empty;
             this.Location = string.Empty;
-            this.RemoteEndPoints = new SyncCollection<IPEndPoint>
+            this.RemoteEndPoints = new BlockingCollection<IPEndPoint>
                 {
-                    new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, Protocol.DefaultPort), 
-                    new IPEndPoint(Protocol.DiscoveryEndpoints.Broadcast, Protocol.DefaultPort)
+                    Protocol.DiscoveryEndpoints.IPv4, 
+                    Protocol.DiscoveryEndpoints.Broadcast, 
                 };
         }
 
@@ -165,7 +165,7 @@ namespace Upnp.Ssdp
                 {
                     Trace.WriteLine(string.Format("DeviceAlive [{0}, {1}] from {2} to {3}", this.NotificationType, this.USN, socket.LocalEndpoint, ep), AppInfo.Application);
 
-                    var notify = Protocol.CreateAliveNotify(new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, 1900), location, this.NotificationType, this.USN, this.MaxAge, this.UserAgent);
+                    var notify = Protocol.CreateAliveNotify(Protocol.DiscoveryEndpoints.IPv4, location, this.NotificationType, this.USN, this.MaxAge, this.UserAgent);
                     var bytes = Encoding.ASCII.GetBytes(notify);
 
                     socket.Send(bytes, bytes.Length, ep);    
@@ -254,7 +254,7 @@ namespace Upnp.Ssdp
         {
             ForEachRemoteEndPoint((ep, socket) =>
             {
-                var byeByeNotify = Protocol.CreateByeByeNotify(new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, 1900), this.NotificationType, this.USN);
+                var byeByeNotify = Protocol.CreateByeByeNotify(Protocol.DiscoveryEndpoints.IPv4, this.NotificationType, this.USN);
                 var bytes = Encoding.ASCII.GetBytes(byeByeNotify);
                 Trace.WriteLine(string.Format("DeviceByeBye [{0}, {1}] from {2} to {3}", this.NotificationType, this.USN, socket.LocalEndpoint, ep), AppInfo.Application);
                 socket.Send(bytes, bytes.Length, ep);

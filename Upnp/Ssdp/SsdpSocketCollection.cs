@@ -91,7 +91,7 @@ namespace Upnp.Ssdp
         public virtual void StartListening(params IPAddress[] groups)
         {
             if (groups == null || groups.Length == 0)
-                groups = new[] { Protocol.DiscoveryEndpoints.IPv4 };
+                groups = new[] { Protocol.DiscoveryEndpoints.IPv4.Address };
 
             ForEachSocket(socket =>
             {

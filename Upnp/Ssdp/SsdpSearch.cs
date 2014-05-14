@@ -6,6 +6,7 @@ using System.Text;
 using System.Net;
 using System.Threading;
 using System.IO;
+using System.Threading.Tasks;
 using Upnp.Net;
 using Upnp.Timers;
 
@@ -31,7 +32,7 @@ namespace Upnp.Ssdp
             }
 
             this.Server = socket;
-            this.HostEndpoint = new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, Protocol.DefaultPort);
+            this.HostEndpoint = Protocol.DiscoveryEndpoints.IPv4;
             this.SearchType = Protocol.SsdpAll;
             this.Mx = Protocol.DefaultMx;
         }
@@ -99,19 +100,20 @@ namespace Upnp.Ssdp
         {
             var results = new List<SsdpMessage>();
             EventHandler<EventArgs<SsdpMessage>> resultHandler = (sender, e) =>
+            {
+                lock (results)
                 {
-                    lock (results)
-                    {
-                        results.Add(e.Value);
-                    }
-                };
+                    results.Add(e.Value);
+                }
+            };
+
             EventHandler completeHandler = (sender, e) =>
+            {
+                lock (results)
                 {
-                    lock (results)
-                    {
-                        Monitor.PulseAll(results);
-                    }
-                };
+                    Monitor.PulseAll(results);
+                }
+            };
 
             try
             {
@@ -140,10 +142,6 @@ namespace Upnp.Ssdp
             }
         }
 
-        /// <summary>
-        /// Searches asynchronously.
-        /// </summary>
-        /// <param name="destinations">The destinations.</param>
         public void SearchAsync(params IPEndPoint[] destinations)
         {
             lock (this.SearchLock)
@@ -162,8 +160,8 @@ namespace Upnp.Ssdp
 
             // If no destinations were specified then default to the IPv4 discovery
             if (destinations == null || destinations.Length == 0)
-                destinations = new[] {new IPEndPoint(Protocol.DiscoveryEndpoints.IPv4, Protocol.DefaultPort)};
-
+                destinations = new[] {Protocol.DiscoveryEndpoints.IPv4};
+            
             // Start the server and join our igmp groups
             this.Server.StartListening();
 

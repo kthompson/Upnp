@@ -57,7 +57,7 @@ namespace Upnp.Ssdp
         public virtual void StartListening(params IPAddress[] remoteEps)
         {
             if (remoteEps == null || remoteEps.Length == 0)
-                remoteEps = new[] { Protocol.DiscoveryEndpoints.IPv4 };
+                remoteEps = new[] { Protocol.DiscoveryEndpoints.IPv4.Address };
 
             lock (this.Server)
             {
