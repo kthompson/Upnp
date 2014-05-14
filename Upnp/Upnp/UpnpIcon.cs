@@ -22,16 +22,14 @@ namespace Upnp.Upnp
             if (reader.LocalName != "icon" && !reader.ReadToDescendant("icon"))
                 throw new InvalidDataException();
 
-            var dict = new Dictionary<string, Action>()
+            XmlHelper.ParseXml(reader, new XmlParseSet
             {
                 {"url", () => this.RelativeUrl = reader.ReadString()},
                 {"mimetype", () => this.MimeType = reader.ReadString()},
                 {"width", () => this.Width = reader.ReadElementContentAsInt()},
                 {"height", () => this.Height = reader.ReadElementContentAsInt()},
                 {"depth", () => this.Depth = reader.ReadElementContentAsInt()}
-            };
-
-            XmlHelper.ParseXml(reader, dict);
+            });
         }
 
         public void WriteXml(XmlWriter writer)

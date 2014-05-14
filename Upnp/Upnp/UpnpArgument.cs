@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Xml;
 using System.Xml.Serialization;
 using System.IO;
 using Upnp.Xml;
@@ -25,19 +26,17 @@ namespace Upnp.Upnp
             return null;
         }
 
-        public void ReadXml(System.Xml.XmlReader reader)
+        public void ReadXml(XmlReader reader)
         {
             if (reader.LocalName != "argument" && !reader.ReadToDescendant("argument"))
                 throw new InvalidDataException();
 
-            var dict = new Dictionary<string, Action>()
+            XmlHelper.ParseXml(reader, new XmlParseSet
             {
                 {"name", () => this.Name = reader.ReadString()},
                 {"direction", () => this.Direction = reader.ReadString()},
                 {"relatedStateVariable", () => this.RelatedStateVariable = reader.ReadString()}
-            };
-
-            XmlHelper.ParseXml(reader, dict);
+            });
         }
 
         public void WriteXml(System.Xml.XmlWriter writer)

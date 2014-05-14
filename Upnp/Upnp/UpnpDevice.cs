@@ -56,20 +56,19 @@ namespace Upnp.Upnp
                 throw new InvalidDataException();
             
             // TODO: Serialize/Deserialize required Upnp properties separate from the default property
-            var dict = new Dictionary<string, Action>()
+
+            XmlHelper.ParseXml(reader, new XmlParseSet
             {
                 {XmlHelper.DefaultParseElementName, () => 
-                    {
-                        if (!this.Properties.ContainsKey(reader.LocalName))
-                            this.Properties.Add(reader.LocalName, reader.ReadString());
-                    }
+                {
+                    if (!this.Properties.ContainsKey(reader.LocalName))
+                        this.Properties.Add(reader.LocalName, reader.ReadString());
+                }
                 },
-                {"deviceList", () => XmlHelper.ParseXmlCollection(reader, this.Devices, "device", () => new UpnpDevice())},
-                {"serviceList", () => XmlHelper.ParseXmlCollection(reader, this.Services, "service", () => new UpnpService())},
-                {"iconList", () => XmlHelper.ParseXmlCollection(reader, this.Icons, "icon", () => new UpnpIcon())}
-            };
-
-            XmlHelper.ParseXml(reader, dict);
+                {"deviceList", this.Devices, "device", () => new UpnpDevice()},
+                {"serviceList", this.Services, "service", () => new UpnpService()},
+                {"iconList", this.Icons, "icon", () => new UpnpIcon()}
+            });
         }
   
         public void WriteXml(XmlWriter writer)

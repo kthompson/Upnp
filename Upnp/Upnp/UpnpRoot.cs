@@ -40,22 +40,20 @@ namespace Upnp.Upnp
             if (reader.HasAttributes)
                 this.ConfigurationId = int.Parse(reader.GetAttribute("configId") ?? "-1");
 
-            var dict = new Dictionary<string, Action>()
+            XmlHelper.ParseXml(reader, new XmlParseSet
             {
-                {"specVersion", () => XmlHelper.ParseXml(reader, new Dictionary<string, Action> {
+                {"specVersion", () => XmlHelper.ParseXml(reader, new XmlParseSet {
                     {"major", () => this.UpnpMajorVersion = reader.ReadElementContentAsInt()},
                     {"minor", () => this.UpnpMinorVersion = reader.ReadElementContentAsInt()}
                 })
                 },
                 {"URLBase", () => this.UrlBase = new Uri(reader.ReadString())},
-                {"device", () => {
-                        this.RootDevice = new UpnpDevice();
-                        this.RootDevice.ReadXml(reader);
-                    }
-                },
-            };
-
-            XmlHelper.ParseXml(reader, dict);
+                {"device", () =>
+                {
+                    this.RootDevice = new UpnpDevice();
+                    this.RootDevice.ReadXml(reader);
+                }}
+            });
         }
 
         public void WriteXml(XmlWriter writer)

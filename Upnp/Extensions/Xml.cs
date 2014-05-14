@@ -6,11 +6,10 @@ namespace Upnp.Extensions
 {
     public static class Xml
     {
-
         public static void WriteCollection<T>(this XmlWriter writer, ICollection<T> collection, string elementName, bool omitIfEmpty = false)
             where T : IXmlSerializable
         {
-            if (omitIfEmpty && collection == null || collection.Count == 0)
+            if (omitIfEmpty && (collection == null || collection.Count == 0))
                 return;
 
             writer.WriteStartElement(elementName);

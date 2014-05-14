@@ -32,14 +32,12 @@ namespace Upnp.Upnp
 
             if (reader.HasAttributes)
                 this.SendEvents = ((reader.GetAttribute("sendEvents") ?? "no") == "yes");
-            
-            var dict = new Dictionary<string, Action>()
+
+            XmlHelper.ParseXml(reader, new XmlParseSet
             {
                 {"name", () => this.Name = reader.ReadString()},
                 {"dataType", () => this.DataType = reader.ReadString()}
-            };
-
-            XmlHelper.ParseXml(reader, dict);
+            });
         }
 
         public void WriteXml(System.Xml.XmlWriter writer)

@@ -13,7 +13,7 @@ namespace Upnp.Upnp
 
         public UpnpAction()
         {
-            this.Arguments = new CustomActionCollection<UpnpArgument>((arg) => arg.Action = this, (arg) => arg.Action = null);
+            this.Arguments = new CustomActionCollection<UpnpArgument>(arg => arg.Action = this, arg => arg.Action = null);
         }
 
         #region Object Overrides
@@ -37,13 +37,11 @@ namespace Upnp.Upnp
             if (reader.LocalName != "action" && !reader.ReadToDescendant("action"))
                 throw new InvalidDataException();
 
-            var dict = new Dictionary<string, Action>()
+            XmlHelper.ParseXml(reader, new XmlParseSet
             {
                 {"name", () => this.Name = reader.ReadString()},
-                {"argumentList", () => XmlHelper.ParseXmlCollection(reader, this.Arguments, "argument", () => new UpnpArgument())}
-            };
-
-            XmlHelper.ParseXml(reader, dict);
+                {"argumentList", this.Arguments, "argument", () => new UpnpArgument()}
+            });
         }
 
         public void WriteXml(System.Xml.XmlWriter writer)

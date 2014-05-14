@@ -30,19 +30,17 @@ namespace Upnp.Upnp
             if (reader.LocalName != "scpd" && !reader.ReadToDescendant("scpd"))
                 throw new InvalidDataException();
 
-            var dict = new Dictionary<string, Action>()
+            XmlHelper.ParseXml(reader, new XmlParseSet
             {
-                {"specVersion", () => XmlHelper.ParseXml(reader, new Dictionary<string, Action>
-                    {
-                        {"major", () => this.VersionMajor = reader.ReadElementContentAsInt()},
-                        {"minor", () => this.VersionMinor = reader.ReadElementContentAsInt()}
-                    })
+                {"specVersion", () => XmlHelper.ParseXml(reader, new XmlParseSet
+                {
+                    {"major", () => this.VersionMajor = reader.ReadElementContentAsInt()},
+                    {"minor", () => this.VersionMinor = reader.ReadElementContentAsInt()}
+                })
                 },
                 {"actionList", () => XmlHelper.ParseXmlCollection(reader, this.Actions, "action", () => new UpnpAction())},
                 {"serviceStateTable", () => XmlHelper.ParseXmlCollection(reader, this.Variables, "stateVariable", () => new UpnpStateVariable())}
-            };
-
-            XmlHelper.ParseXml(reader, dict);
+            });
         }
 
         public void WriteXml(XmlWriter writer)
@@ -56,7 +54,6 @@ namespace Upnp.Upnp
             writer.WriteCollection(this.Actions, "actionList", true);
             writer.WriteCollection(this.Variables, "serviceStateTable", true);
             writer.WriteEndElement();
-
         }
 
         #endregion
