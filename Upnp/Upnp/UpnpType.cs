@@ -22,9 +22,12 @@ namespace Upnp.Upnp
 
         public static UpnpType Parse(string urn)
         {
+            if(string.IsNullOrEmpty(urn))
+                throw new ArgumentNullException("urn");
+
             string[] parts = urn.Split(':');
             if (parts.Length != 5)
-                throw new ArgumentException();
+                throw new FormatException("urn must be a ");
 
             return new UpnpType(parts[1], parts[2], parts[3], Version.Parse(parts[4] + ".0"));
         }
@@ -33,42 +36,44 @@ namespace Upnp.Upnp
 
         #region Object Overrides
 
-        public override bool Equals(object obj)
+        public bool Equals(UpnpType other)
         {
-            UpnpType type = obj as UpnpType;
-            if (type == null)
+            if (ReferenceEquals(null, other)) 
                 return false;
 
-            return this.Domain == type.Domain &&
-                this.Kind == type.Kind &&
-                this.Type == type.Type &&
-                this.Version == type.Version;
+            if (ReferenceEquals(this, other)) 
+                return true;
+
+            return string.Equals(Domain, other.Domain) && 
+                   string.Equals(Kind, other.Kind) && 
+                   string.Equals(Type, other.Type) && 
+                   Equals(Version, other.Version);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj)) 
+                return false;
+
+            if (ReferenceEquals(this, obj)) 
+                return true;
+
+            if (obj.GetType() != this.GetType()) 
+                return false;
+
+            return Equals((UpnpType) obj);
         }
 
         public override int GetHashCode()
         {
-            return this.Domain.GetHashCode() ^ this.Kind.GetHashCode() ^ this.Type.GetHashCode() ^ this.Version.GetHashCode();
-        }
-
-        public bool Equals(UpnpType other)
-        {
-            if((object)other == null)
-                return false;
-
-            return (other.Domain == this.Domain && 
-                    other.Kind == this.Kind && 
-                    other.Type == this.Type && 
-                    other.Version == this.Version);
-        }
-
-        public static bool operator ==(UpnpType a, UpnpType b)
-        {
-            return a.Equals(b);
-        }
-
-        public static bool operator !=(UpnpType a, UpnpType b)
-        {
-            return !(a == b);
+            unchecked
+            {
+                var hashCode = (Domain != null ? Domain.GetHashCode() : 0);
+                hashCode = (hashCode*397) ^ (Kind != null ? Kind.GetHashCode() : 0);
+                hashCode = (hashCode*397) ^ (Type != null ? Type.GetHashCode() : 0);
+                hashCode = (hashCode*397) ^ (Version != null ? Version.GetHashCode() : 0);
+                return hashCode;
+            }
         }
 
         public override string ToString()
