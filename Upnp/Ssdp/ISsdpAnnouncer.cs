@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using Upnp.Collections;
@@ -33,7 +34,7 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Gets the remote end points.
         /// </summary>
-        SyncCollection<IPEndPoint> RemoteEndPoints { get; }
+        BlockingCollection<IPEndPoint> RemoteEndPoints { get; }
 
         /// <summary>
         /// Gets or sets the type of the notification.

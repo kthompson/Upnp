@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -318,7 +319,7 @@ namespace Upnp.Ssdp
         /// <summary>
         /// Gets the remote end points.
         /// </summary>
-        public SyncCollection<IPEndPoint> RemoteEndPoints
+        public BlockingCollection<IPEndPoint> RemoteEndPoints
         {
             get;
             private set;
