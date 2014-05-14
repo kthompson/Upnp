@@ -49,7 +49,15 @@ namespace Upnp.Tests
                 client.StartListening();
 
                 var search = client.CreateSearch(false);
-                search.ResultFound += TestResultFound;
+                search.SearchType = "urn:schemas-upnp-org:service:test:1";
+                search.ResultFound += (sender, e) =>
+                {
+                    lock (mutex)
+                    {
+                        if (IsTestAnnouncement(e.Value))
+                            Monitor.Pulse(mutex);
+                    }
+                };
 
                 lock (mutex)
                 {
@@ -108,8 +116,26 @@ namespace Upnp.Tests
             }
         }
 
+        [Test] 
+        public void SearchShouldRespondToSearchTypeAll()
+        {
+            using (var client = new SsdpClient())
+            using (var server = new SsdpServer())
+            {
+                server.CreateAnnouncer("urn:schemas-upnp-org:service:test:1", "uuid:979F4CE8-64AF-4653-B207-D7514908356F::urn:schemas-upnp-org:service:test:1");
+                server.StartListening();
+
+                client.StartListening();
+
+                var search = client.CreateSearch(false);
+                search.SearchType = Protocol.SsdpAll;
+                var results = search.Search();
+                Assert.That(results.Exists(IsTestAnnouncement));
+            }
+        }
+
         [Test]
-        public void SearchTest()
+        public void SearchShouldRespondToDefaultSearchType()
         {
             using (var client = new SsdpClient())
             using (var server = new SsdpServer())
@@ -228,7 +254,7 @@ namespace Upnp.Tests
                     
                     if (Monitor.Wait(mutex, TimeSpan.FromSeconds(10)))
                     {
-                        Assert.Fail("The client recieved invalid announcements.");
+                        Assert.Fail("The client received invalid announcements.");
                     }
                 }
             }
