@@ -1,56 +1,61 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Xml;
 using System.Xml.Serialization;
 
 namespace Upnp.Xml
 {
-    public class XmlStateMachine : IEnumerable
+    public class XmlParseSet : IEnumerable
     {
-        readonly Dictionary<string, Action<XmlReader>> _actions = new Dictionary<string, Action<XmlReader>>();
+        private readonly Dictionary<string, Action> _actions;
+        private readonly List<Action<XmlReader>> _delayedActions;
 
-        public void Add(string key, Action<XmlReader> value)
+        public XmlParseSet()
         {
-            _actions.Add(key, value);
+            _delayedActions = new List<Action<XmlReader>>();
+            this._actions = new Dictionary<string, Action>();
         }
 
-        public void Add(Action<XmlReader> value)
+        public void Add(Action action)
         {
-            Add(XmlHelper.DefaultParseElementName, value);
+            _actions.Add(XmlHelper.DefaultParseElementName, action);
         }
 
-        public void Add(string key, XmlStateMachine value)
+        public void Add(string element, Action action)
         {
-            _actions.Add(key, reader => value.Add(reader, key));
+            _actions.Add(element, action);
         }
 
-        public void Add(XmlStateMachine value)
+        public void Add<T>(string element, ICollection<T> collection, string subElement, Func<T> activator) 
+            where T : IXmlSerializable
         {
-            Add(XmlHelper.DefaultParseElementName, value);
+            _delayedActions.Add(reader => _actions.Add(element, () => XmlHelper.ParseXmlCollection(reader, collection, subElement, activator)));
         }
 
-        public void Add(XmlReader reader, string endElement = null)
+        public Dictionary<string, Action> ToDictionary(XmlReader reader)
         {
-            XmlHelper.ParseXml(reader, _actions.ToDictionary(kv => kv.Key, kv => (Action)(() => kv.Value(reader))), endElement);
-        }
+            foreach (var delayedAction in _delayedActions)
+                delayedAction(reader);
 
-        public void Parse(XmlReader reader, string endElement = null)
-        {
-            Add(reader, endElement);
+            return _actions;
         }
 
         public IEnumerator GetEnumerator()
         {
-            throw new NotSupportedException();    
+            throw new NotSupportedException();
         }
     }
 
     public static class XmlHelper
-    {
-
+    {   
         public const string DefaultParseElementName = "@default";
+
+        public static void ParseXml(XmlReader reader, XmlParseSet actions, string endElement = null)
+        {
+            var set = actions.ToDictionary(reader);
+            ParseXml(reader, set, endElement);
+        }
 
         public static void ParseXml(XmlReader reader, Dictionary<string, Action> actions, string endElement = null)
         {
@@ -93,11 +98,25 @@ namespace Upnp.Xml
                     defaultAction();
             }
         }
+        
+        public static void ParseXmlDictionary(XmlReader reader, IDictionary<string, string> collection, string elementName = DefaultParseElementName)
+        {
+            ParseXml(reader, new Dictionary<string, Action>
+            {
+                {elementName, () => collection[reader.LocalName] = reader.ReadInnerXml()}
+            });
+        }
+
+        public static void ParseXmlCollection<T>(XmlReader reader, ICollection<T> collection, Func<T> creator)
+            where T : IXmlSerializable
+        {
+            ParseXmlCollection(reader, collection, DefaultParseElementName, creator);
+        }
 
         public static void ParseXmlCollection<T>(XmlReader reader, ICollection<T> collection, string elementName, Func<T> creator)
             where T : IXmlSerializable
         {
-            var dict = new Dictionary<string, Action>()
+            var dict = new Dictionary<string, Action>
             {
                 {elementName, () =>
                     {
